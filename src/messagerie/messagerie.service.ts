@@ -1,0 +1,181 @@
+import {
+  Injectable, NotFoundException, BadRequestException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Messages } from '../entities/messages.entity';
+import { Personne } from '../entities/personne.entity';
+import { Parents } from '../entities/parents.entity';
+import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/messagerie.dto';
+
+@Injectable()
+export class MessagerieService {
+  constructor(
+    @InjectRepository(Messages)
+    private messagesRepository: Repository<Messages>,
+    @InjectRepository(Personne)
+    private personneRepository: Repository<Personne>,
+    @InjectRepository(Parents)
+    private parentsRepository: Repository<Parents>,
+  ) {}
+
+  private getTypeLibelle(type: number): string {
+    const types: Record<number, string> = {
+      0: 'Individuel', 1: 'Tous les parents', 2: 'Paiement',
+    };
+    return types[type] ?? 'Autre';
+  }
+
+  async createMessage(dto: CreateMessageDto): Promise<Messages> {
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: dto.idExp_Pers } });
+    if (!expediteur) throw new NotFoundException(`Expéditeur introuvable (idPers: ${dto.idExp_Pers})`);
+
+    const destinataire = await this.parentsRepository.findOne({
+      where: { idParent: dto.idParent }, relations: ['personne'],
+    });
+    if (!destinataire) throw new NotFoundException(`Parent introuvable (idParent: ${dto.idParent})`);
+
+    const message = this.messagesRepository.create({
+      objet: dto.objet,
+      information: dto.information,
+      type_message: dto.type_message ?? 0,
+      AnneeAcade: dto.AnneeAcade ?? '',  // ✅ string directement
+      valider: 0,
+      expediteur,
+      destinataire,
+    });
+    return this.messagesRepository.save(message);
+  }
+
+  async envoyerEnMasse(dto: EnvoiMasseDto): Promise<{ envoyes: number; erreurs: string[] }> {
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: dto.idExp_Pers } });
+    if (!expediteur) throw new NotFoundException(`Expéditeur introuvable (idPers: ${dto.idExp_Pers})`);
+
+    let envoyes = 0;
+    const erreurs: string[] = [];
+
+    for (const idParent of dto.idParents) {
+      const destinataire = await this.parentsRepository.findOne({
+        where: { idParent }, relations: ['personne'],
+      });
+      if (!destinataire) { erreurs.push(`Parent id ${idParent} introuvable`); continue; }
+
+      const message = this.messagesRepository.create({
+        objet: dto.objet, information: dto.information,
+        type_message: dto.type_message ?? 1,
+        AnneeAcade: dto.AnneeAcade ?? '',
+        valider: 1, expediteur, destinataire,
+      });
+      await this.messagesRepository.save(message);
+      envoyes++;
+    }
+    return { envoyes, erreurs };
+  }
+
+  async findAll(): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findEnvoyes(): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { valider: 1 },
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findBrouillons(): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { valider: 0 },
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findByParent(idParent: number): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { destinataire: { idParent }, valider: 1 },
+      relations: ['expediteur'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findByExpediteur(idPers: number): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { expediteur: { idPers } },
+      relations: ['destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findByType(type: number): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { type_message: type },
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findByAnnee(annee: string): Promise<Messages[]> {
+    return this.messagesRepository.find({
+      where: { AnneeAcade: annee },
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findById(idMessages: number): Promise<Messages> {
+    const msg = await this.messagesRepository.findOne({
+      where: { idMessages },
+      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+    });
+    if (!msg) throw new NotFoundException(`Message introuvable (id: ${idMessages})`);
+    return msg;
+  }
+
+  async updateMessage(idMessages: number, dto: UpdateMessageDto): Promise<Messages> {
+    const msg = await this.findById(idMessages);
+    if (msg.valider === 1) throw new BadRequestException('Impossible de modifier un message déjà envoyé.');
+    if (dto.objet !== undefined) msg.objet = dto.objet;
+    if (dto.information !== undefined) msg.information = dto.information;
+    if (dto.type_message !== undefined) msg.type_message = dto.type_message;
+    if (dto.AnneeAcade !== undefined) msg.AnneeAcade = dto.AnneeAcade;
+    return this.messagesRepository.save(msg);
+  }
+
+  async validerMessage(idMessages: number): Promise<{ message: string }> {
+    const msg = await this.findById(idMessages);
+    if (msg.valider === 1) throw new BadRequestException('Ce message est déjà validé et envoyé');
+    msg.valider = 1;
+    await this.messagesRepository.save(msg);
+    return { message: `Message "${msg.objet}" validé et envoyé` };
+  }
+
+  async archiverMessage(idMessages: number): Promise<{ message: string }> {
+    const msg = await this.findById(idMessages);
+    if (msg.valider === 0) throw new BadRequestException("Impossible d'archiver un brouillon.");
+    msg.valider = 2;
+    await this.messagesRepository.save(msg);
+    return { message: `Message id ${idMessages} archivé` };
+  }
+
+  async removeMessage(idMessages: number): Promise<{ message: string }> {
+    const msg = await this.findById(idMessages);
+    if (msg.valider === 1) throw new BadRequestException('Impossible de supprimer un message envoyé.');
+    await this.messagesRepository.remove(msg);
+    return { message: `Message id ${idMessages} supprimé` };
+  }
+
+  async getStats(): Promise<{ total: number; envoyes: number; brouillons: number; archives: number }> {
+    const tous = await this.messagesRepository.find();
+    return {
+      total: tous.length,
+      envoyes: tous.filter(m => m.valider === 1).length,
+      brouillons: tous.filter(m => m.valider === 0).length,
+      archives: tous.filter(m => m.valider === 2).length,
+    };
+  }
+}
