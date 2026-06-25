@@ -12,13 +12,13 @@ import { Epreuve } from './epreuve.entity';
  */
 @Entity('natureepreuve')
 export class NatureEpreuve {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idNature: number;
 
   @Column({ type: 'varchar', length: 255, default: 'INDEFINI', comment: 'Controle Continu, Examen, Devoir Mercredi, Devoir Week End' })
   libelle: string;
 
-  @Column({ type: 'tinytext', nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   // ─── Relations ────────────────────────────────────────────────────────

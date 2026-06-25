@@ -10,6 +10,22 @@ import { Enseignant } from '../entities/enseignant.entity';
 import { Titulaire } from '../entities/titulaire.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
+import { Cours } from '../entities/cours.entity';
+import { Salle } from '../entities/salle.entity';
+import { Classe } from '../entities/classe.entity';
+import { MailService } from '../mail/mail.service';
+
+// Génère un mot de passe provisoire lisible (sans caractères ambigus)
+function genererMotDePasse(longueur = 10): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let p = '';
+  for (let i = 0; i < longueur; i++) p += chars[Math.floor(Math.random() * chars.length)];
+  return p;
+}
+
+const LIBELLE_TYPE: Record<number, string> = {
+  1: 'Enseignant', 2: 'Administratif', 3: 'Scolarité', 4: 'Parent', 5: 'Personnel',
+};
 import {
   CreatePersonneEnseignantDto,
   UpdatePersonneEnseignantDto,
@@ -31,6 +47,17 @@ export class ProfesseursService {
 
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
+
+    @InjectRepository(Cours)
+    private coursRepository: Repository<Cours>,
+
+    @InjectRepository(Salle)
+    private salleRepository: Repository<Salle>,
+
+    @InjectRepository(Classe)
+    private classeRepository: Repository<Classe>,
+
+    private readonly mailService: MailService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -41,7 +68,38 @@ export class ProfesseursService {
    * Créer le profil Personne d'un enseignant
    * typePersonne = 2 (Professeur)
    */
-  async createPersonne(dto: CreatePersonneEnseignantDto): Promise<Personne> {
+  /**
+   * Résout l'admin à rattacher (idAdmin NOT NULL), de la source la plus précise
+   * à la moins précise :
+   *   1. idAdmin explicitement fourni
+   *   2. le créateur s'il est admin → lui-même
+   *   3. le créateur s'il est une personne → son admin gestionnaire
+   *   4. repli : l'admin racine (le plus ancien)
+   */
+  private async resoudreAdmin(
+    dtoIdAdmin?: number,
+    user?: { id: number; role: string },
+  ): Promise<Admin | null> {
+    if (dtoIdAdmin) {
+      const a = await this.adminRepository.findOne({ where: { ID: dtoIdAdmin } });
+      if (a) return a;
+    }
+    if (user?.role === 'admin' && user.id) {
+      const a = await this.adminRepository.findOne({ where: { ID: user.id } });
+      if (a) return a;
+    }
+    if (user?.role === 'personne' && user.id) {
+      const p = await this.personneRepository.findOne({ where: { idPers: user.id }, relations: ['admin'] });
+      if (p?.admin) return p.admin;
+    }
+    const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+    return premier[0] ?? null;
+  }
+
+  async createPersonne(
+    dto: CreatePersonneEnseignantDto,
+    user?: { id: number; role: string },
+  ): Promise<Personne> {
     // Vérifier que le username n'existe pas déjà
     const exists = await this.personneRepository.findOne({
       where: { username: dto.username },
@@ -52,28 +110,45 @@ export class ProfesseursService {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // Mot de passe : fourni, sinon généré par le backend (envoyé ensuite par email)
+    const motDePasseGenere = !dto.password;
+    const motDePasseClair = dto.password ?? genererMotDePasse();
+    const hashedPassword = await bcrypt.hash(motDePasseClair, 10);
 
+    // Valeurs par défaut pour les colonnes NOT NULL non renseignées
     const personne = this.personneRepository.create({
       nom: dto.nom,
       prenom: dto.prenom,
-      dateNaissance: dto.dateNaissance ? new Date(dto.dateNaissance) : undefined,
-      lieuNaissance: dto.lieuNaissance,
-      mobile: dto.mobile,
-      phone: dto.phone,
-      typePersonne: 2, // 2 = Professeur
+      dateNaissance: dto.dateNaissance ? new Date(dto.dateNaissance) : new Date('2000-01-01'),
+      lieuNaissance: dto.lieuNaissance ?? 'INDEFINI',
+      mobile: dto.mobile ?? '000',
+      phone: dto.phone ?? '000',
+      typePersonne: dto.typePersonne ?? 2, // défaut : 2 = Professeur
       username: dto.username,
       password: hashedPassword,
     });
 
-    if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({
-        where: { ID: dto.idAdmin },
+    // Admin gestionnaire : attribution précise (créateur), repli sur l'admin racine
+    const admin = await this.resoudreAdmin(dto.idAdmin, user);
+    if (admin) personne.admin = admin;
+
+    const saved = await this.personneRepository.save(personne);
+
+    // Si le mot de passe a été généré, on envoie les identifiants par email
+    let emailEnvoye: boolean | null = null;
+    if (motDePasseGenere) {
+      emailEnvoye = await this.mailService.envoyerIdentifiants({
+        to: dto.username,
+        nomComplet: `${dto.prenom} ${dto.nom}`,
+        username: dto.username,
+        motDePasse: motDePasseClair,
+        role: LIBELLE_TYPE[dto.typePersonne ?? 2] ?? 'Personnel',
       });
-      if (admin) personne.admin = admin;
     }
 
-    return this.personneRepository.save(personne);
+    // On expose le statut d'envoi pour que le frontend puisse alerter si échec
+    (saved as any).emailEnvoye = emailEnvoye;
+    return saved;
   }
 
   /**
@@ -84,6 +159,34 @@ export class ProfesseursService {
       where: { typePersonne: 2 },
       order: { nom: 'ASC' },
     });
+  }
+
+  /** Lister toutes les personnes, tous types confondus (pour choisir un expéditeur de message) */
+  async findAllPersonnesTous(): Promise<Personne[]> {
+    return this.personneRepository.find({ order: { nom: 'ASC' } });
+  }
+
+  /**
+   * Supprimer un compte Personne (membre du personnel ou parent).
+   * On retire d'abord ses liens directs (enseignant, titulaire).
+   */
+  async removePersonne(idPers: number): Promise<{ message: string }> {
+    const personne = await this.personneRepository.findOne({ where: { idPers } });
+    if (!personne) throw new NotFoundException('Personne introuvable');
+
+    const ens = await this.enseignantRepository.find({ where: { personne: { idPers } } });
+    if (ens.length) await this.enseignantRepository.remove(ens);
+    const tits = await this.titulaireRepository.find({ where: { personne: { idPers } } });
+    if (tits.length) await this.titulaireRepository.remove(tits);
+
+    try {
+      await this.personneRepository.remove(personne);
+    } catch {
+      throw new ConflictException(
+        "Suppression impossible : ce compte est lié à d'autres données (messages, notes, paiements, parent…).",
+      );
+    }
+    return { message: 'Compte supprimé' };
   }
 
   /**
@@ -150,17 +253,34 @@ export class ProfesseursService {
       throw new ConflictException('Cette personne est déjà enregistrée comme enseignant');
     }
 
+    // Classe gérée (obligatoire) : l'enseignant y donne toutes les matières
+    const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
+    if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
+
+    // Matière de difficulté (cours qu'il ne donne pas) — optionnelle
+    let cours: Cours | undefined = undefined;
+    if (dto.idCours) {
+      const c = await this.coursRepository.findOne({ where: { idCours: dto.idCours } });
+      if (!c) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
+      cours = c;
+    }
+
     const enseignant = this.enseignantRepository.create({
       personne,
+      classe,
+      cours,
       actif: 1, // ✅ minuscule corrigé
     });
 
-    if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({
-        where: { ID: dto.idAdmin },
-      });
-      if (admin) enseignant.admin = admin;
+    // Admin : fourni, sinon l'admin racine par défaut (idAdmin NOT NULL en BD)
+    let admin = dto.idAdmin
+      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+      : null;
+    if (!admin) {
+      const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+      admin = premier[0] ?? null;
     }
+    if (admin) enseignant.admin = admin;
 
     return this.enseignantRepository.save(enseignant);
   }
@@ -250,17 +370,35 @@ export class ProfesseursService {
       throw new ConflictException('Cette personne est déjà enregistrée comme titulaire');
     }
 
+    // idSalle est NOT NULL en BD
+    const salle = await this.salleRepository.findOne({ where: { idSalle: dto.idSalle } });
+    if (!salle) throw new NotFoundException(`Salle introuvable (id: ${dto.idSalle})`);
+
+    // Une salle ne peut avoir qu'UN SEUL titulaire actif
+    const dejaTitulaire = await this.titulaireRepository.findOne({
+      where: { salle: { idSalle: dto.idSalle }, actif: 1 },
+    });
+    if (dejaTitulaire) {
+      throw new ConflictException(
+        "Cette salle a déjà un titulaire actif. Désactivez-le avant d'en affecter un autre.",
+      );
+    }
+
     const titulaire = this.titulaireRepository.create({
       personne,
+      salle,
       actif: 1,
     });
 
-    if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({
-        where: { ID: dto.idAdmin },
-      });
-      if (admin) titulaire.admin = admin;
+    // Admin : celui fourni, sinon l'admin racine par défaut
+    let admin = dto.idAdmin
+      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+      : null;
+    if (!admin) {
+      const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+      admin = premier[0] ?? null;
     }
+    if (admin) titulaire.admin = admin;
 
     return this.titulaireRepository.save(titulaire);
   }

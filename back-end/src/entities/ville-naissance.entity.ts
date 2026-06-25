@@ -7,13 +7,13 @@ import { Eleve } from './eleve.entity';
  */
 @Entity('villenaissance')
 export class VilleNaissance {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idVille: number;
 
   @Column({ type: 'varchar', length: 100, default: 'Autres' })
   libelle: string;
 
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   actif: number;
 
   // ─── Relations ────────────────────────────────────────────────────────

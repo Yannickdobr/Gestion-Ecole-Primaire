@@ -13,13 +13,13 @@ import { Scolarite } from './scolarite.entity';
  */
 @Entity('tranches')
 export class Tranches {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idTranche: number;
 
   @Column({ type: 'varchar', length: 255 })
   libelle: string;
 
-  @Column({ type: 'float', unsigned: true, default: 0 })
+  @Column({ type: 'real', default: 0 })
   montant: number;
 
   @Column({ type: 'char', length: 2 })
@@ -28,10 +28,10 @@ export class Tranches {
   @Column({ type: 'char', length: 2 })
   delai_jour: string; // ex: "15" pour le 15
 
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   actif: number;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   idFondateur: number;
 
   // ─── Relations ────────────────────────────────────────────────────────

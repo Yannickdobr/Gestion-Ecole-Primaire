@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsIn,
   IsString,
+  IsEmail,
   MaxLength,
   IsDateString,
   MinLength,
@@ -42,15 +43,23 @@ export class CreatePersonneEnseignantDto {
   @MaxLength(15)
   phone?: string;
 
-  @IsString()
-  @IsNotEmpty({ message: "Le nom d'utilisateur est obligatoire" })
+  // L'identifiant de connexion est l'adresse email (les coordonnées y sont envoyées)
+  @IsEmail({}, { message: "L'identifiant doit être une adresse email valide" })
+  @IsNotEmpty({ message: "L'email est obligatoire" })
   @MaxLength(100)
   username: string;
 
+  // Mot de passe optionnel : s'il est absent, le backend en génère un et l'envoie par email
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Le mot de passe est obligatoire' })
   @MinLength(4)
-  password: string;
+  password?: string;
+
+  // 1=Enseignant, 2=Administratif, 3=Scolarité, 4=Parents, 5=Autres (défaut 2)
+  @IsOptional()
+  @IsInt()
+  @IsIn([1, 2, 3, 4, 5], { message: 'typePersonne doit être 1, 2, 3, 4 ou 5' })
+  typePersonne?: number;
 
   @IsOptional()
   @IsInt()
@@ -104,6 +113,16 @@ export class CreateEnseignantDto {
   @IsNotEmpty({ message: "L'identifiant de la personne est obligatoire" })
   idPers: number;
 
+  // Salle attribuée à l'enseignant (obligatoire) → sa classe en découle (salle.classe)
+  @IsInt()
+  @IsNotEmpty({ message: "L'identifiant de la salle est obligatoire" })
+  idSalle: number;
+
+  // Matière de difficulté (le cours qu'il ne donne pas) — optionnel
+  @IsOptional()
+  @IsInt()
+  idCours?: number;
+
   @IsOptional()
   @IsInt()
   idAdmin?: number;
@@ -116,6 +135,11 @@ export class CreateTitulaireDto {
   @IsInt()
   @IsNotEmpty({ message: "L'identifiant de la personne est obligatoire" })
   idPers: number;
+
+  // idSalle est NOT NULL en BD (un titulaire est responsable d'une salle)
+  @IsInt()
+  @IsNotEmpty({ message: "L'identifiant de la salle est obligatoire" })
+  idSalle: number;
 
   @IsOptional()
   @IsInt()

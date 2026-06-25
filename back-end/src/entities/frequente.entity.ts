@@ -18,13 +18,13 @@ import { Eleve } from './eleve.entity';
  */
 @Entity('frequente')
 export class Frequente {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idFrequente: number;
 
   @Column({ type: 'varchar', length: 255, default: 'RAS' })
   commentaire: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

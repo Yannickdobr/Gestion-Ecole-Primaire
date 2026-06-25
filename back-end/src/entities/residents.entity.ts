@@ -9,15 +9,15 @@ import { Admin } from './admin.entity';
 /**
  * Entité Residents – Lien entre une Personne et un Quartier
  */
-@Entity('Residents')
+@Entity('residents')
 export class Residents {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idResi: number;
 
-  @Column({ type: 'tinytext' })
+  @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Personne, { nullable: false })

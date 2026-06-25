@@ -18,16 +18,16 @@ import { Personne } from './personne.entity';
  */
 @Entity('evaluation')
 export class Evaluation {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idEval: number;
 
-  @Column({ type: 'float', default: 0 })
+  @Column({ type: 'real', default: 0 })
   note: number;
 
   @Column({ type: 'varchar', length: 255 })
   appreciation: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

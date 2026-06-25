@@ -135,6 +135,10 @@ export class EvaluationsController {
   @ApiOperation({ summary: 'Notes d\'un cours' })
   findNotesByCours(@Param('idCours', ParseIntPipe) idCours: number) { return this.evaluationsService.findNotesByCours(idCours); }
 
+  @Get('classement/session/:idSession')
+  @ApiOperation({ summary: 'Classement d\'une session (moyennes + rangs)' })
+  classementSession(@Param('idSession', ParseIntPipe) idSession: number) { return this.evaluationsService.classementSession(idSession); }
+
   @Get('notes/moyenne/:matricule/session/:idSession')
   @ApiOperation({ summary: 'Calculer la moyenne d\'un élève pour une session' })
   calculerMoyenne(

@@ -6,12 +6,12 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
  */
 @Entity('discipline')
 export class Discipline {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   ID: number;
 
   @Column({ type: 'varchar', length: 255 })
   libelle: string;
 
-  @Column({ type: 'int', unsigned: true, default: 0 })
+  @Column({ type: 'int', default: 0 })
   points: number;
 }

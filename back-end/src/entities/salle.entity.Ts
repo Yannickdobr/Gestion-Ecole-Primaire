@@ -10,9 +10,9 @@ import { Frequente } from './frequente.entity';
  * Entité Salle
  * ✅ FIX: ajout du champ "actif" présent dans la BD mais manquant dans l'entity
  */
-@Entity('Salle')
+@Entity('salle')
 export class Salle {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idSalle: number;
 
   @Column({ type: 'varchar', length: 30 })
@@ -25,10 +25,10 @@ export class Salle {
   surface: string;
 
   // ✅ FIX: champ actif présent dans la BD (tinyint DEFAULT 1)
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   actif: number;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Classe, (classe) => classe.salles, { eager: true, nullable: false })

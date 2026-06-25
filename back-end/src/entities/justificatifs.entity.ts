@@ -6,23 +6,23 @@ import {
 /**
  * Entité Justificatifs – Documents justificatifs liés aux rapports
  */
-@Entity('Justificatifs')
+@Entity('justificatifs')
 export class Justificatifs {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   ID: number;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   idRapport: number;
 
   @Column({ type: 'text' })
   commentaire: string;
 
-  @Column({ type: 'int', unsigned: true, nullable: true })
+  @Column({ type: 'int', nullable: true })
   idDirecteur: number;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   urlDoc: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 }

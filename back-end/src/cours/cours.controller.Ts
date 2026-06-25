@@ -34,22 +34,9 @@ export class CoursController {
   @ApiOperation({ summary: 'Cours actifs d\'une classe' })
   findCoursByClasse(@Param('idClasse', ParseIntPipe) idClasse: number) { return this.coursService.findCoursByClasse(idClasse); }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Détail d\'un cours' })
-  findCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.findCoursById(id); }
-
-  @Put(':id')
-  @ApiOperation({ summary: 'Modifier un cours' })
-  updateCours(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCoursDto) { return this.coursService.updateCours(id, dto); }
-
-  @Patch(':id/desactiver')
-  @ApiOperation({ summary: 'Désactiver un cours' })
-  desactiverCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.desactiverCours(id); }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer un cours' })
-  removeCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeCours(id); }
+  // NB : les routes :id sont déclarées plus bas, APRÈS les routes statiques
+  // (disciplines, specialites, livres) — sinon /cours/livres serait capturé
+  // par /cours/:id (ParseIntPipe → 400).
 
   // ── Disciplines ────────────────────────────────────────────────────────
   @Get('disciplines')
@@ -128,4 +115,22 @@ export class CoursController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un livre' })
   removeLivre(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeLivre(id); }
+
+  // ── Cours par id (déclaré APRÈS les routes statiques pour éviter la collision) ──
+  @Get(':id')
+  @ApiOperation({ summary: 'Détail d\'un cours' })
+  findCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.findCoursById(id); }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Modifier un cours' })
+  updateCours(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCoursDto) { return this.coursService.updateCours(id, dto); }
+
+  @Patch(':id/desactiver')
+  @ApiOperation({ summary: 'Désactiver un cours' })
+  desactiverCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.desactiverCours(id); }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Supprimer un cours' })
+  removeCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeCours(id); }
 }

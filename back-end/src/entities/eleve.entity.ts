@@ -21,7 +21,7 @@ import { Frequente } from './frequente.entity';
  */
 @Entity('eleve')
 export class Eleve {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   matricule: number;
 
   @Column({ type: 'varchar', length: 60 })
@@ -36,7 +36,7 @@ export class Eleve {
   @Column({ type: 'varchar', length: 30 })
   lieuNaissance: string;
 
-  @Column({ type: 'smallint', unsigned: true, default: 0, comment: '0 = fille, 1 = garcon, 2 = autres' })
+  @Column({ type: 'smallint', default: 0, comment: '0 = fille, 1 = garcon, 2 = autres' })
   sexe: number; // 0=fille, 1=garcon, 2=autres
 
   @Column({ type: 'varchar', length: 30, default: 'INDEFINI' })
@@ -45,10 +45,10 @@ export class Eleve {
   @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
   photoURL: string;
 
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 0 })
+  @Column({ type: 'smallint', default: 0 })
   actif: number; // 1=actif, 0=inactif
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

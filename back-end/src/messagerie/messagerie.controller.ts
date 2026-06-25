@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, ParseIntPipe, UseGuards, HttpCode, HttpStatus, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MessagerieService } from './messagerie.service';
@@ -29,6 +29,10 @@ export class MessagerieController {
   @ApiOperation({ summary: 'Statistiques : total, envoyés, brouillons, archivés, par type' })
   getStats() { return this.messagerieService.getStats(); }
 
+  @Get('mes-messages')
+  @ApiOperation({ summary: 'Messages du compte connecté (reçus si parent, envoyés sinon)' })
+  mesMessages(@Request() req) { return this.messagerieService.mesMessages(req.user); }
+
   @Get('parent/:idParent')
   @ApiOperation({ summary: 'Messages reçus par un parent' })
   findByParent(@Param('idParent', ParseIntPipe) idParent: number) { return this.messagerieService.findByParent(idParent); }
@@ -53,12 +57,12 @@ export class MessagerieController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un message (brouillon par défaut)' })
-  createMessage(@Body() dto: CreateMessageDto) { return this.messagerieService.createMessage(dto); }
+  createMessage(@Request() req, @Body() dto: CreateMessageDto) { return this.messagerieService.createMessage(dto, req.user); }
 
   @Post('masse')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Envoyer le même message à plusieurs parents en une fois' })
-  envoyerEnMasse(@Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto); }
+  envoyerEnMasse(@Request() req, @Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto, req.user); }
 
   @Put(':id')
   @ApiOperation({ summary: 'Modifier un brouillon (impossible si déjà envoyé)' })

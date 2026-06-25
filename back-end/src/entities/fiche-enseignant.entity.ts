@@ -9,18 +9,18 @@ import { AnneeAcademique } from './annee-academique.entity';
  * Entité FicheEnseignant – Fiche de suivi/évaluation d'un enseignant
  * Table présente dans la BD mais non mappée
  */
-@Entity('FicheEnseignant')
+@Entity('ficheenseignant')
 export class FicheEnseignant {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idRap: number;
 
   @Column({ type: 'varchar', length: 100 })
   libelle: string;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   points: number;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   idAdministratif: number;
 
   @Column({ type: 'text' })
@@ -29,7 +29,7 @@ export class FicheEnseignant {
   @Column({ type: 'date' })
   event_date: Date;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Enseignant, { nullable: false })

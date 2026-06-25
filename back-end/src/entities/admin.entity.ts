@@ -5,20 +5,22 @@ import {
     CreateDateColumn,
     OneToMany,
   } from 'typeorm';
+  import { Exclude } from 'class-transformer';
   import { Personne } from './personne.entity';
-  
+
   /**
    * Entité Admin – Compte administrateur de l'application
    * Correspond à la table `admin` du MCD
    *
    * typeAdmin :
-   *   1 = Super Administrateur
-   *   2 = Administrateur standard
-   *   3 = Fondateur / Directeur
+   *   0 = Root (super-administrateur)
+   *   1 = Admin
+   *   2 = Fondateur
+   *   3 = Directeur
    */
   @Entity('admin')
   export class Admin {
-    @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+    @PrimaryGeneratedColumn({ type: 'int' })
     ID: number;
   
     @Column({ type: 'varchar', length: 100, default: 'Root' })
@@ -27,13 +29,14 @@ import {
     @Column({ type: 'varchar', length: 50, unique: true })
     username: string;
   
+    @Exclude()
     @Column({ type: 'varchar', length: 255 })
-    password: string; // stocké en bcrypt
+    password: string; // stocké en bcrypt, jamais exposé en API
   
-    @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+    @Column({ type: 'smallint', default: 1 })
     actif: number; // 1 = actif, 0 = désactivé
   
-    @Column({ type: 'smallint', unsigned: true, comment: '0 = root, 1 = Admin, 2 = Fondateur , 3 = Directeur' })
+    @Column({ type: 'smallint', comment: '0 = root, 1 = Admin, 2 = Fondateur , 3 = Directeur' })
     typeAdmin: number; // 0=root, 1=Admin, 2=Fondateur, 3=Directeur
   
     @Column({ type: 'varchar', length: 15 })
@@ -42,7 +45,7 @@ import {
     @Column({ type: 'varchar', length: 15 })
     alanyaID: string;
   
-    @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     created_at: Date;
   
     // ─── Relations ────────────────────────────────────────────────────────

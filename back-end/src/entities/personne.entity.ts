@@ -23,7 +23,7 @@ import { Admin } from './admin.entity';
  */
 @Entity('personne')
 export class Personne {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idPers: number;
 
   @Column({ type: 'varchar', length: 255 })
@@ -44,7 +44,7 @@ export class Personne {
   @Column({ type: 'varchar', length: 15, default: '000' })
   phone: string;
 
-  @Column({ type: 'smallint', unsigned: true, comment: '1= Enseignant , 2 = Administratif, 3 = Scolarite, 4= parents, 5 = Autres' })
+  @Column({ type: 'smallint', comment: '1= Enseignant , 2 = Administratif, 3 = Scolarite, 4= parents, 5 = Autres' })
   typePersonne: number; // 1= Enseignant , 2 = Administratif, 3 = Scolarite, 4= parents, 5 = Autres
 
   @Column({ type: 'varchar', length: 100, unique: true })
@@ -58,7 +58,7 @@ export class Personne {
   @Column({ type: 'varchar', length: 15, nullable: true })
   alanyaID: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
  // ─── Relations ────────────────────────────────────────────────────────

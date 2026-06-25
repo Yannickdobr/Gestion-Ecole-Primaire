@@ -24,9 +24,10 @@ export class CreateMessageDto {
   @MaxLength(15)
   AnneeAcade?: string;
 
+  // Expéditeur dérivé du compte connecté (ignoré s'il est envoyé) — sécurité
+  @IsOptional()
   @IsInt()
-  @IsNotEmpty({ message: "L'identifiant de l'expéditeur est obligatoire" })
-  idExp_Pers: number;
+  idExp_Pers?: number;
 
   @IsInt()
   @IsNotEmpty({ message: "L'identifiant du parent destinataire est obligatoire" })
@@ -74,9 +75,10 @@ export class EnvoiMasseDto {
   @MaxLength(15)
   AnneeAcade?: string;
 
+  // Expéditeur dérivé du compte connecté (ignoré s'il est envoyé)
+  @IsOptional()
   @IsInt()
-  @IsNotEmpty()
-  idExp_Pers: number;
+  idExp_Pers?: number;
 
   @IsInt({ each: true })
   @IsNotEmpty()

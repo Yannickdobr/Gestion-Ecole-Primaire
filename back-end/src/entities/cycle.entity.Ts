@@ -5,19 +5,19 @@ import {
 import { Admin } from './admin.entity';
 import { Classe } from './classe.entity';
 
-@Entity('Cycle')  // ✅ nom exact de la table SQL (casse)
+@Entity('cycle')  // ✅ nom exact de la table SQL (casse)
 export class Cycle {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idCycle: number;
 
   @Column({ type: 'varchar', length: 255 })
   libelle: string;
 
-  @Column({ type: 'tinytext' })
+  @Column({ type: 'text' })
   description: string;
 
   // ✅ FIX: SQL utilise "created" (pas created_at)
-  @Column({ type: 'datetime', name: 'created', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', name: 'created', default: () => 'CURRENT_TIMESTAMP' })
   created: Date;
 
   @ManyToOne(() => Admin, { nullable: false })

@@ -1,0 +1,302 @@
+{
+  "Admin": [
+    {
+      "ID": 1,
+      "nom": "Ngono Therese",
+      "username": "t_ngono",
+      "password": "motdepasse",
+      "actif": 1,
+      "typeAdmin": 3,
+      "mobile": "677123456",
+      "alanyaID": "AL-ADM-01",
+      "created_at": "2026-01-15T08:30:00Z"
+    }
+  ],
+  "AnneeAcademique": [
+    {
+      "idAnnee": 2026,
+      "libelle": "Année Académique 2025/2026",
+      "periode": "Septembre 2025 - Juin 2026",
+      "created_at": "2025-09-01",
+      "idAdmin": 1
+    }
+  ],
+  "Cycle": [
+    {
+      "idCycle": 1,
+      "libelle": "Cycle Francophone",
+      "description": "Enseignement primaire de la SIL au CM2",
+      "idAdmin": 1,
+      "created": "2026-01-15T09:00:00Z"
+    },
+    {
+      "idCycle": 2,
+      "libelle": "Anglophone Cycle",
+      "description": "Primary education from Class 1 to Class 6",
+      "idAdmin": 1,
+      "created": "2026-01-15T09:05:00Z"
+    }
+  ],
+  "Classe": [
+    {
+      "idClasse": 101,
+      "libelle": "SIL",
+      "idCycle": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-15T10:00:00Z"
+    },
+    {
+      "idClasse": 106,
+      "libelle": "CM2",
+      "idCycle": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-15T10:15:00Z"
+    }
+  ],
+  "Salle": [
+    {
+      "idSalle": 1,
+      "libelle": "Salle A (Bâtiment Principal)",
+      "position": "Rez-de-chaussée droite",
+      "surface": "45m²",
+      "idClasse": 101,
+      "actif": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-15T11:00:00Z"
+    },
+    {
+      "idSalle": 6,
+      "libelle": "Salle CM2 Élite",
+      "position": "1er Étage gauche",
+      "surface": "50m²",
+      "idClasse": 106,
+      "actif": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-15T11:05:00Z"
+    }
+  ],
+  "VilleNaissance": [
+    { "idVille": 1, "libelle": "Yaoundé", "actif": 1 },
+    { "idVille": 2, "libelle": "Douala", "actif": 1 },
+    { "idVille": 3, "libelle": "Bafoussam", "actif": 1 }
+  ],
+  "Eleve": [
+    {
+      "matricule": 20260001,
+      "nom": "EBOUTOU",
+      "prenom": "Marc",
+      "dateNaissance": "2016-04-12",
+      "lieuNaissance": "Hôpital Central",
+      "sexe": 1,
+      "langue": "Français",
+      "photoURL": "/uploads/students/20260001.jpg",
+      "actif": 1,
+      "idVilleNaissance": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-20T14:22:10Z"
+    },
+    {
+      "matricule": 20260002,
+      "nom": "ATANGANA",
+      "prenom": "Marie Noëlle",
+      "dateNaissance": "2015-11-23",
+      "lieuNaissance": "Clinique de la Paix",
+      "sexe": 0,
+      "langue": "Français",
+      "photoURL": "/uploads/students/20260002.jpg",
+      "actif": 1,
+      "idVilleNaissance": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-20T14:25:30Z"
+    }
+  ],
+  "Frequente": [
+    {
+      "idFrequente": 1,
+      "idSalle": 6,
+      "idAcademi": 2026,
+      "matricule": 20260001,
+      "commentaire": "Excellent élève, transféré de Douala",
+      "idAdmin": 1,
+      "created_at": "2026-01-20T15:00:00Z"
+    },
+    {
+      "idFrequente": 2,
+      "idSalle": 6,
+      "idAcademi": 2026,
+      "matricule": 20260002,
+      "commentaire": "RAS",
+      "idAdmin": 1,
+      "created_at": "2026-01-20T15:02:00Z"
+    }
+  ],
+  "Personne": [
+    {
+      "idPers": 501,
+      "nom": "KAMDEM",
+      "prenom": "Jean Pierre",
+      "dateNaissance": "1984-07-19",
+      "lieuNaissance": "Bafoussam",
+      "mobile": "699887766",
+      "phone": "222334455",
+      "typePersonne": 1,
+      "username": "jp_kamdem",
+      "password": "password",
+      "alanyaID": "AL-PERS-501",
+      "idAdmin": 1,
+      "created_at": "2026-01-16T08:00:00Z"
+    },
+    {
+      "idPers": 601,
+      "nom": "EBOUTOU",
+      "prenom": "Charles",
+      "dateNaissance": "1978-03-02",
+      "lieuNaissance": "Ebolowa",
+      "mobile": "655112233",
+      "phone": "000",
+      "typePersonne": 4,
+      "username": "c_eboutou",
+      "password": "eboutou",
+      "alanyaID": "AL-PERS-601",
+      "idAdmin": 1,
+      "created_at": "2026-01-18T16:40:00Z"
+    }
+  ],
+  "Parents": [
+    {
+      "idParent": 1001,
+      "idPers": 601,
+      "matricule": 20260001,
+      "idAdmin": 1,
+      "created_at": "2026-01-18T16:45:00Z"
+    }
+  ],
+  "Cours": [
+    {
+      "idCours": 1001,
+      "libelle": "Mathématiques (Calcul)",
+      "note": 20.0,
+      "coefficient": 4.0,
+      "description": "Opérations de base, fractions et géométrie élémentaire",
+      "idClasse": 106,
+      "actif": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-16T09:30:00Z"
+    },
+    {
+      "idCours": 1002,
+      "libelle": "Production d'Écrits (Français)",
+      "note": 20.0,
+      "coefficient": 3.0,
+      "description": "Rédaction de textes, grammaire et conjugaison",
+      "idClasse": 106,
+      "actif": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-16T09:35:00Z"
+    }
+  ],
+  "Enseignant": [
+    {
+      "idEnseignant": 1,
+      "idPers": 501,
+      "idCours": 1001,
+      "Actif": 1,
+      "idAdmin": 1,
+      "created_at": "2026-01-16T10:00:00Z"
+    }
+  ],
+  "Trimestre": [
+    {
+      "idTrimes": 1,
+      "libelle": "1er Trimestre",
+      "periode": "Septembre - Décembre",
+      "idAca": 2026,
+      "idAdmin": 1
+    }
+  ],
+  "Session": [
+    {
+      "idSession": 11,
+      "libelle": "Évaluation Séquence 1",
+      "description": "Contrôle de début d'année",
+      "idTrimestre": 1,
+      "idPers": 501,
+      "created_at": "2026-10-05T17:00:00Z"
+    }
+  ],
+  "NatureEpreuve": [
+    {
+      "idNature": 1,
+      "libelle": "Contrôle Continu",
+      "description": "Évaluation formative en classe"
+    }
+  ],
+  "Epreuve": [
+    {
+      "idEpreuve": 5001,
+      "libelle": "Composition de Mathématiques Séquence 1",
+      "urlDoc": "/uploads/exams/math_seq1_2026.pdf",
+      "auteur": "Mr. Kamdem",
+      "idNature": 1,
+      "idPers": 501,
+      "created_at": "2026-10-10T08:00:00Z"
+    }
+  ],
+  "Evaluation": [
+    {
+      "idEval": 9001,
+      "note": 15.5,
+      "appreciation": "Bien. Poursuivez ainsi.",
+      "matricule": 20260001,
+      "idEpreuve": 5001,
+      "idCours": 1001,
+      "idSession": 11,
+      "idPers": 501,
+      "created_at": "2026-10-12T14:00:00Z"
+    },
+    {
+      "idEval": 9002,
+      "note": 11.0,
+      "appreciation": "Passable, des efforts s'imposent en géométrie.",
+      "matricule": 20260002,
+      "idEpreuve": 5001,
+      "idCours": 1001,
+      "idSession": 11,
+      "idPers": 501,
+      "created_at": "2026-10-12T14:05:00Z"
+    }
+  ],
+  "Mode": [
+    {
+      "idMode": 1,
+      "libelle": "Espèces",
+      "information": "Paiement direct à la caisse de l'école",
+      "actif": 1,
+      "idFondateur": 1,
+      "created_at": "2026-01-15T08:00:00Z"
+    },
+    {
+      "idMode": 2,
+      "libelle": "Mobile Money",
+      "information": "Paiement via MTN / Orange Money",
+      "actif": 1,
+      "idFondateur": 1,
+      "created_at": "2026-01-15T08:02:00Z"
+    }
+  ],
+  "Paiement": [
+    {
+      "idPaie": 3001,
+      "matricule": 20260001,
+      "idAca": 2026,
+      "montant": 45000.0,
+      "url": "/uploads/receipts/rec_3001.pdf",
+      "comentaire": "Première tranche scolarité",
+      "idMode": 2,
+      "operation_ID": "TXN987654321",
+      "idPers": 601,
+      "datePaie": "2025-09-05",
+      "dateEnregistrer": "2025-09-05T10:30:00Z"
+    }
+  ]
+}

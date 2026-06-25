@@ -28,6 +28,13 @@ export class ElevesController {
   @ApiQuery({ name: 'q', required: true, description: 'Nom ou prénom à rechercher' })
   search(@Query('q') query: string) { return this.elevesService.search(query ?? ''); }
 
+  @Get('parent/:idPers')
+  @ApiOperation({ summary: 'Lister les enfants d\'un parent' })
+  @ApiParam({ name: 'idPers', description: 'Identifiant (idPers) du parent' })
+  findByParent(@Param('idPers', ParseIntPipe) idPers: number) {
+    return this.elevesService.findByParent(idPers);
+  }
+
   @Get(':matricule')
   @ApiOperation({ summary: 'Détail d\'un élève' })
   @ApiParam({ name: 'matricule', description: 'Matricule de l\'élève' })

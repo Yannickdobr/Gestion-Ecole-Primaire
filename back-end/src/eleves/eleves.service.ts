@@ -33,14 +33,15 @@ import {
   
     // ─── Créer un élève ────────────────────────────────────────────────────────
     async create(dto: CreateEleveDto): Promise<Eleve> {
+      // Valeurs par défaut pour les colonnes NOT NULL non renseignées
       const eleve = this.eleveRepository.create({
         nom: dto.nom,
         prenom: dto.prenom,
         dateNaissance: new Date(dto.dateNaissance),
-        lieuNaissance: dto.lieuNaissance,
+        lieuNaissance: dto.lieuNaissance ?? 'INDEFINI',
         sexe: dto.sexe,
-        langue: dto.langue,
-        photoURL: dto.photoURL,
+        langue: dto.langue ?? 'INDEFINI',
+        photoURL: dto.photoURL ?? 'INDEFINI',
         actif: 1,
       });
   
@@ -55,14 +56,17 @@ import {
         eleve.villeNaissance = ville;
       }
   
-      // Rattacher l'admin si fourni
-      if (dto.idAdmin) {
-        const admin = await this.adminRepository.findOne({
-          where: { ID: dto.idAdmin },
-        });
-        if (admin) eleve.admin = admin;
+      // Rattacher l'admin : celui fourni, sinon l'admin racine par défaut
+      // (permet à la scolarité — une Personne, pas un Admin — d'inscrire des élèves)
+      let admin = dto.idAdmin
+        ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+        : null;
+      if (!admin) {
+        const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+        admin = premier[0] ?? null;
       }
-  
+      if (admin) eleve.admin = admin;
+
       return this.eleveRepository.save(eleve);
     }
   
@@ -83,6 +87,16 @@ import {
       });
     }
   
+    // ─── Lister les enfants d'un parent (par idPers du parent) ────────────────
+    async findByParent(idPers: number): Promise<Eleve[]> {
+      const liens = await this.parentsRepository.find({
+        where: { personne: { idPers } },
+        relations: ['eleve', 'eleve.villeNaissance'],
+      });
+      // Un parent peut être lié à plusieurs élèves ; on retourne les élèves
+      return liens.map((lien) => lien.eleve).filter(Boolean);
+    }
+
     // ─── Trouver un élève par matricule ───────────────────────────────────────
     async findOne(matricule: number): Promise<Eleve> {
       const eleve = await this.eleveRepository.findOne({
@@ -144,6 +158,7 @@ import {
   
       const personne = await this.personneRepository.findOne({
         where: { idPers: dto.idPers },
+        relations: ['admin'],
       });
       if (!personne) {
         throw new NotFoundException(`Personne introuvable (id: ${dto.idPers})`);
@@ -160,7 +175,9 @@ import {
       const parent = this.parentsRepository.create({
         personne,
         eleve,
+        admin: personne.admin, // idAdmin NOT NULL en BD — repris de la personne
       });
+
       return this.parentsRepository.save(parent);
     }
   

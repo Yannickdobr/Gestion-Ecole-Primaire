@@ -61,11 +61,12 @@ export class PaiementsService {
     const exists = await this.modeRepository.findOne({ where: { libelle: dto.libelle } });
     if (exists) throw new ConflictException(`Le mode "${dto.libelle}" existe déjà`);
 
+    // Valeurs par défaut pour les colonnes NOT NULL non renseignées
     const mode = this.modeRepository.create({
       libelle: dto.libelle,
-      information: dto.information,
+      information: dto.information ?? 'INDEFINI',
       actif: 1,
-      idFondateur: dto.idFondateur,
+      idFondateur: dto.idFondateur ?? 0,
     });
     return this.modeRepository.save(mode);
   }
@@ -106,8 +107,8 @@ export class PaiementsService {
       inscription: dto.inscription,
       pension: dto.pension,
       nbreTranche: dto.nbreTranche ?? 3,
-      description: dto.description,
-      idFondateur: dto.idFondateur,
+      description: dto.description ?? 'INDEFINI', // NOT NULL en BD
+      idFondateur: dto.idFondateur ?? 0, // NOT NULL en BD (colonne sans FK)
       cycle,
     });
 
@@ -169,10 +170,10 @@ export class PaiementsService {
     const tranche = this.trancheRepository.create({
       libelle: dto.libelle,
       montant: dto.montant,
-      delai_mois: dto.delai_mois,
-      delai_jour: dto.delai_jour,
+      delai_mois: dto.delai_mois ?? '00', // char(2) NOT NULL
+      delai_jour: dto.delai_jour ?? '00', // char(2) NOT NULL
       actif: 1,
-      idFondateur: dto.idFondateur,
+      idFondateur: dto.idFondateur ?? 0, // NOT NULL en BD
       scolarite,
     });
     return this.trancheRepository.save(tranche);
@@ -226,9 +227,9 @@ export class PaiementsService {
     const paiement = this.paiementRepository.create({
       montant: dto.montant,
       datePaie: new Date(dto.datePaie),
-      url: dto.url,
-      commentaire: dto.commentaire,
-      operation_ID: dto.operation_ID,
+      url: dto.url ?? 'INDEFINI', // NOT NULL en BD
+      commentaire: dto.commentaire ?? 'INDEFINI',
+      operation_ID: dto.operation_ID ?? 'INDEFINI',
       eleve,
       anneeAcademique: annee,
       mode,
@@ -294,45 +295,69 @@ export class PaiementsService {
    * Total payé = somme des paiements enregistrés
    * Arriéré = Total dû - Total payé
    */
-  async calculerArrieres(matricule: number, idAca: number): Promise<{
-    matricule: number;
-    annee: string;
-    totalDu: number;
-    totalPaye: number;
-    arriere: number;
-    paiements: Paiement[];
-  }> {
+  async calculerArrieres(matricule: number, idAca: number): Promise<any> {
+    // On charge l'élève avec ses affectations (Frequente) pour déduire son cycle
     const eleve = await this.eleveRepository.findOne({
       where: { matricule },
-      relations: ['villeNaissance'],
+      relations: [
+        'frequentations',
+        'frequentations.anneeAcademique',
+        'frequentations.salle',
+        'frequentations.salle.classe',
+        'frequentations.salle.classe.cycle',
+      ],
     });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${matricule})`);
 
     const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${idAca})`);
 
-    // Récupérer les paiements de l'élève pour cette année
     const paiements = await this.paiementRepository.find({
       where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca } },
       relations: ['mode'],
       order: { datePaie: 'ASC' },
     });
-
     const totalPaye = paiements.reduce((sum, p) => sum + p.montant, 0);
 
-    // Chercher la scolarité selon le cycle de l'élève via Frequente
-    // Pour simplifier, on retourne le totalDu comme 0 si pas de scolarité définie
-    // À affiner selon la classe de l'élève
-    const totalDu = 0; // sera enrichi côté frontend avec la scolarité du cycle
+    // Déduire la classe + le cycle via l'affectation de l'élève pour CETTE année
+    const freq = (eleve.frequentations || []).find(
+      (f) => Number(f.anneeAcademique?.idAnnee) === Number(idAca),
+    );
+    const classe = freq?.salle?.classe ?? null;
+    const cycle = classe?.cycle ?? null;
 
+    // Scolarité (frais) du cycle, avec ses tranches
+    let scolarite: Scolarite | null = null;
+    if (cycle) {
+      scolarite = await this.scolariteRepository.findOne({
+        where: { cycle: { idCycle: cycle.idCycle } },
+        relations: ['tranches', 'cycle'],
+      });
+    }
+    const inscription = scolarite ? scolarite.inscription : 0;
+    const pension = scolarite ? scolarite.pension : 0;
+    const totalDu = inscription + pension;
     const arriere = Math.max(0, totalDu - totalPaye);
 
+    const r2 = (n: number) => Math.round(n * 100) / 100;
     return {
       matricule,
       annee: annee.libelle,
-      totalDu,
-      totalPaye: Math.round(totalPaye * 100) / 100,
-      arriere: Math.round(arriere * 100) / 100,
+      classe: classe ? { idClasse: classe.idClasse, libelle: classe.libelle } : null,
+      cycle: cycle ? { idCycle: cycle.idCycle, libelle: cycle.libelle } : null,
+      scolariteDefinie: !!scolarite,
+      inscription: r2(inscription),
+      pension: r2(pension),
+      tranches: (scolarite?.tranches || []).map((t) => ({
+        idTranche: t.idTranche,
+        libelle: t.libelle,
+        montant: t.montant,
+        delai_mois: t.delai_mois,
+        delai_jour: t.delai_jour,
+      })),
+      totalDu: r2(totalDu),
+      totalPaye: r2(totalPaye),
+      arriere: r2(arriere),
       paiements,
     };
   }

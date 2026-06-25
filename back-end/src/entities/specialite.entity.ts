@@ -10,9 +10,9 @@ import { Livres } from './livres.entity';
  * ✅ FIX: suppression de idParent — absent de la BD SQL
  * BD: idSpecialite, libelle, idAdmin uniquement
  */
-@Entity('Specialite')
+@Entity('specialite')
 export class Specialite {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idSpecialite: number;
 
   @Column({ type: 'varchar', length: 255 })

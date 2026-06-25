@@ -17,13 +17,13 @@ import {
    */
   @Entity('classe')
   export class Classe {
-    @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+    @PrimaryGeneratedColumn({ type: 'int' })
     idClasse: number;
   
     @Column({ type: 'varchar', length: 100, default: 'INDEFINI' })
     libelle: string;
   
-    @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     created_at: Date;
   
     // ─── Relations ────────────────────────────────────────────────────────

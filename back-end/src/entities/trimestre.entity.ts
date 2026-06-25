@@ -16,7 +16,7 @@ import { Session } from './session.entity';
  */
 @Entity('trimestre')
 export class Trimestre {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idTrimes: number;
 
   @Column({ type: 'varchar', length: 255 })

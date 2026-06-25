@@ -17,25 +17,25 @@ import { Tranches } from './tranches.entity';
  */
 @Entity('scolarite')
 export class Scolarite {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idScolarite: number;
 
-  @Column({ type: 'float', unsigned: true })
+  @Column({ type: 'real' })
   inscription: number; // frais d'inscription
 
-  @Column({ type: 'float', unsigned: true })
+  @Column({ type: 'real' })
   pension: number; // frais de pension annuels
 
-  @Column({ type: 'smallint', unsigned: true, default: 3 })
+  @Column({ type: 'smallint', default: 3 })
   nbreTranche: number; // nombre de tranches de paiement
 
-  @Column({ type: 'tinytext' })
+  @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   idFondateur: number;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

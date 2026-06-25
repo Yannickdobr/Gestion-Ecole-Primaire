@@ -14,7 +14,7 @@ import {
    */
   @Entity('anneeacademique')
   export class AnneeAcademique {
-    @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+    @PrimaryGeneratedColumn({ type: 'int' })
     idAnnee: number;
   
     @Column({ type: 'varchar', length: 200 })

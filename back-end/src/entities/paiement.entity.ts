@@ -12,12 +12,12 @@ import { Personne } from './personne.entity';
  * ✅ FIX: "comentaire" (typo BD avec 1 seul 'm') mappé via name
  * ✅ FIX: "dateEnregistrer" est le vrai nom de la colonne dans la BD
  */
-@Entity('Paiement')
+@Entity('paiement')
 export class Paiement {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idPaie: number;
 
-  @Column({ type: 'float' })
+  @Column({ type: 'real' })
   montant: number;
 
   @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
@@ -34,7 +34,7 @@ export class Paiement {
   datePaie: Date;
 
   // ✅ FIX: la BD utilise "dateEnregistrer" pas "created_at"
-  @Column({ type: 'datetime', name: 'dateEnregistrer', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', name: 'dateEnregistrer', default: () => 'CURRENT_TIMESTAMP' })
   dateEnregistrer: Date;
 
   @ManyToOne(() => Eleve, { eager: true, nullable: false })
