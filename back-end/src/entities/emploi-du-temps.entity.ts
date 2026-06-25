@@ -11,9 +11,9 @@ import { Cours } from './cours.entity';
  * ✅ FIX: suppression de heureFin, idJour, idEnseignant absents de la BD SQL
  * La BD ne contient que : idTemps, jour, heure, idClasse, idCours, idAdmin, created_at
  */
-@Entity('EmploiDuTemps')
+@Entity('emploidutemps')
 export class EmploiDuTemps {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idTemps: number;
 
   @Column({ type: 'varchar', length: 30 })
@@ -22,7 +22,7 @@ export class EmploiDuTemps {
   @Column({ type: 'varchar', length: 6 })
   heure: string; // ex: "08:00"
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Classe, { eager: true, nullable: false })

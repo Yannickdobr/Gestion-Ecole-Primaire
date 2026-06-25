@@ -18,10 +18,10 @@ import {
   @Entity('parents')
   @Unique('uniqueParent', ['personne', 'eleve'])
   export class Parents {
-    @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+    @PrimaryGeneratedColumn({ type: 'int' })
     idParent: number;
   
-    @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     created_at: Date;
   
     // ─── Relations ────────────────────────────────────────────────────────

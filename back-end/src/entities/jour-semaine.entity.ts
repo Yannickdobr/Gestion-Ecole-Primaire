@@ -6,7 +6,7 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
  */
 @Entity('joursemaine')
 export class JourSemaine {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   ID: number;
 
   @Column({ type: 'varchar', length: 15 })

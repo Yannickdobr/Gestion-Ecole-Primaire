@@ -17,7 +17,7 @@ import { Evaluation } from './evaluation.entity';
  */
 @Entity('epreuve')
 export class Epreuve {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idEpreuve: number;
 
   @Column({ type: 'varchar', length: 255 })
@@ -29,7 +29,7 @@ export class Epreuve {
   @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
   auteur: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

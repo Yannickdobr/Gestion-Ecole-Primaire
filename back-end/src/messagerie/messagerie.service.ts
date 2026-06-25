@@ -1,8 +1,8 @@
 import {
-  Injectable, NotFoundException, BadRequestException,
+  Injectable, NotFoundException, BadRequestException, ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Messages } from '../entities/messages.entity';
 import { Personne } from '../entities/personne.entity';
 import { Parents } from '../entities/parents.entity';
@@ -26,9 +26,13 @@ export class MessagerieService {
     return types[type] ?? 'Autre';
   }
 
-  async createMessage(dto: CreateMessageDto): Promise<Messages> {
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: dto.idExp_Pers } });
-    if (!expediteur) throw new NotFoundException(`Expéditeur introuvable (idPers: ${dto.idExp_Pers})`);
+  async createMessage(dto: CreateMessageDto, user: { id: number; role: string }): Promise<Messages> {
+    // 🔒 L'expéditeur est TOUJOURS le compte connecté (impossible d'usurper)
+    if (user.role !== 'personne') {
+      throw new ForbiddenException("Seul un compte Personne (enseignant, scolarité…) peut envoyer un message.");
+    }
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id } });
+    if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
 
     const destinataire = await this.parentsRepository.findOne({
       where: { idParent: dto.idParent }, relations: ['personne'],
@@ -47,9 +51,13 @@ export class MessagerieService {
     return this.messagesRepository.save(message);
   }
 
-  async envoyerEnMasse(dto: EnvoiMasseDto): Promise<{ envoyes: number; erreurs: string[] }> {
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: dto.idExp_Pers } });
-    if (!expediteur) throw new NotFoundException(`Expéditeur introuvable (idPers: ${dto.idExp_Pers})`);
+  async envoyerEnMasse(dto: EnvoiMasseDto, user: { id: number; role: string }): Promise<{ envoyes: number; erreurs: string[] }> {
+    // 🔒 L'expéditeur est TOUJOURS le compte connecté
+    if (user.role !== 'personne') {
+      throw new ForbiddenException("Seul un compte Personne peut envoyer un message.");
+    }
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id } });
+    if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
 
     let envoyes = 0;
     const erreurs: string[] = [];
@@ -101,6 +109,29 @@ export class MessagerieService {
       relations: ['expediteur'],
       order: { created_at: 'DESC' },
     });
+  }
+
+  /**
+   * Messages pertinents pour le compte connecté (confidentialité) :
+   * - admin            → tous les messages (supervision)
+   * - parent (Personne ayant des lignes Parents) → ses messages reçus (validés)
+   * - autre personne (enseignant, scolarité, autres) → ses messages envoyés/brouillons
+   */
+  async mesMessages(user: { id: number; role: string }): Promise<Messages[]> {
+    if (user?.role === 'admin') return this.findAll();
+
+    const lignesParent = await this.parentsRepository.find({
+      where: { personne: { idPers: user.id } },
+    });
+    if (lignesParent.length > 0) {
+      const ids = lignesParent.map((p) => p.idParent);
+      return this.messagesRepository.find({
+        where: { destinataire: { idParent: In(ids) }, valider: 1 },
+        relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+        order: { created_at: 'DESC' },
+      });
+    }
+    return this.findByExpediteur(user.id);
   }
 
   async findByExpediteur(idPers: number): Promise<Messages[]> {

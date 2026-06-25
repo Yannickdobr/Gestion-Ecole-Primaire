@@ -130,10 +130,14 @@ export class EvaluationsService {
 
   async createSession(dto: CreateSessionDto): Promise<Session> {
     const trimestre = await this.findTrimestreById(dto.idTrimestre);
+    // responsable (idPers) est NOT NULL en BD
+    const responsable = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+    if (!responsable) throw new NotFoundException(`Personne introuvable (idPers: ${dto.idPers})`);
     const session = this.sessionRepository.create({
       libelle: dto.libelle,
       description: dto.description,
       trimestre,
+      responsable,
     });
     return this.sessionRepository.save(session);
   }
@@ -297,10 +301,22 @@ export class EvaluationsService {
       session,
     });
 
+    // « saisi par » (idPers) est NOT NULL : on rattache au compte courant.
+    // Quand l'auteur n'est pas une personne (ex. un admin qui saisit), repli
+    // déterministe sur une personne par défaut pour respecter la contrainte.
+    let auteur: Personne | null = null;
     if (dto.idPers) {
-      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
-      if (pers) evaluation.saisirPar = pers;
+      auteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
     }
+    if (!auteur) {
+      auteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+    }
+    if (!auteur) {
+      throw new NotFoundException(
+        'Aucune personne en base pour renseigner « saisi par ». Crée au moins un membre du personnel.',
+      );
+    }
+    evaluation.saisirPar = auteur;
 
     return this.evaluationRepository.save(evaluation);
   }
@@ -372,6 +388,49 @@ export class EvaluationsService {
     return { moyenne, detail };
   }
 
+  /**
+   * Classement d'une session : moyenne (pondérée par coefficient) de chaque
+   * élève évalué, triée et rangée (ex-aequo = même rang).
+   */
+  async classementSession(idSession: number): Promise<{ idSession: number; effectif: number; classement: any[] }> {
+    const notes = await this.evaluationRepository.find({
+      where: { session: { idSession } },
+      relations: ['eleve', 'cours'],
+    });
+
+    const parEleve = new Map<number, { eleve: any; pts: number; coef: number; nb: number }>();
+    for (const n of notes) {
+      const mat = n.eleve?.matricule;
+      if (mat == null) continue;
+      if (!parEleve.has(mat)) parEleve.set(mat, { eleve: n.eleve, pts: 0, coef: 0, nb: 0 });
+      const e = parEleve.get(mat)!;
+      const coef = Number(n.cours?.coefficient) || 1;
+      e.pts += Number(n.note) * coef;
+      e.coef += coef;
+      e.nb += 1;
+    }
+
+    const lignes = [...parEleve.values()]
+      .map((e) => ({
+        matricule: e.eleve.matricule,
+        nom: e.eleve.nom,
+        prenom: e.eleve.prenom,
+        moyenne: e.coef ? Math.round((e.pts / e.coef) * 100) / 100 : 0,
+        nbNotes: e.nb,
+        rang: 0,
+      }))
+      .sort((a, b) => b.moyenne - a.moyenne);
+
+    let rang = 0;
+    let prev: number | null = null;
+    lignes.forEach((l, i) => {
+      if (prev === null || l.moyenne < prev) { rang = i + 1; prev = l.moyenne; }
+      l.rang = rang;
+    });
+
+    return { idSession, effectif: lignes.length, classement: lignes };
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // RAPPORTS
   // ══════════════════════════════════════════════════════════════════════════
@@ -386,17 +445,26 @@ export class EvaluationsService {
 
     const rapport = this.rapportRepository.create({
       libelle: dto.libelle,
-      points: dto.points,
-      commentaire: dto.commentaire,
-      event_date: dto.event_date ? new Date(dto.event_date) : undefined,
+      // points / commentaire / event_date sont NOT NULL en BD : défauts côté service
+      points: dto.points ?? 0,
+      commentaire: dto.commentaire ?? 'RAS',
+      event_date: dto.event_date ? new Date(dto.event_date) : new Date(),
       eleve,
       anneeAcademique: annee, // ✅ FK vers AnneeAcademique comme dans la BD
     });
 
+    // redacteur (idPers) est NOT NULL : compte courant, repli sur une personne par défaut
+    let redacteur: Personne | null = null;
     if (dto.idPers) {
-      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
-      if (pers) rapport.redacteur = pers;
+      redacteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
     }
+    if (!redacteur) {
+      redacteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+    }
+    if (!redacteur) {
+      throw new NotFoundException('Aucune personne en base pour signer le rapport.');
+    }
+    rapport.redacteur = redacteur;
     return this.rapportRepository.save(rapport);
   }
 

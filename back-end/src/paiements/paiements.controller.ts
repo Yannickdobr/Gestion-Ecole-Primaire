@@ -8,6 +8,7 @@ import {
   CreateTrancheDto, UpdateTrancheDto, CreatePaiementDto, UpdatePaiementDto,
 } from './dto/paiements.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FondateurGuard } from '../auth/fondateur.guard';
 
 @ApiTags('Paiements')
 @ApiBearerAuth('JWT-auth')
@@ -45,8 +46,9 @@ export class PaiementsController {
   findAllScolarites() { return this.paiementsService.findAllScolarites(); }
 
   @Post('scolarites')
+  @UseGuards(FondateurGuard) // réservé au Fondateur
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Définir les frais de scolarité d\'un cycle' })
+  @ApiOperation({ summary: 'Définir les frais de scolarité d\'un cycle (Fondateur)' })
   createScolarite(@Body() dto: CreateScolariteDto) { return this.paiementsService.createScolarite(dto); }
 
   @Get('scolarites/par-cycle/:idCycle')
@@ -68,8 +70,9 @@ export class PaiementsController {
 
   // ── Tranches ──────────────────────────────────────────────────────────
   @Post('tranches')
+  @UseGuards(FondateurGuard) // réservé au Fondateur
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Créer une tranche de paiement' })
+  @ApiOperation({ summary: 'Créer une tranche de paiement (Fondateur)' })
   createTranche(@Body() dto: CreateTrancheDto) { return this.paiementsService.createTranche(dto); }
 
   @Get('tranches/par-scolarite/:idScolante')

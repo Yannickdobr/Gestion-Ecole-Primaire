@@ -14,6 +14,8 @@ import { EvaluationsModule } from './evaluations/evaluations.module';
 import { PaiementsModule } from './paiements/paiements.module';
 import { EmploiModule } from './emploi/emploi.module';
 import { MessagerieModule } from './messagerie/messagerie.module';
+import { VillesModule } from './villes/villes.module';
+import { MailModule } from './mail/mail.module';
 
 // ─── Entités ──────────────────────────────────────────────────────────────────
 import { Admin } from './entities/admin.entity';
@@ -58,11 +60,11 @@ import { Residents } from './entities/residents.entity';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
-        type: 'mysql',
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 3306),
-        username: config.get<string>('DB_USERNAME', 'root'),
-        password: config.get<string>('DB_PASSWORD', ''),
+        type: 'postgres',
+        host: config.get<string>('DB_HOST', 'postgres'),
+        port: config.get<number>('DB_PORT', 5433),
+        username: config.get<string>('DB_USERNAME', 'postgres'),
+        password: config.get<string>('DB_PASSWORD', '65732Pauline'),
         database: config.get<string>('DB_NAME', 'ecole_primaire'),
         entities: [
           Admin, Personne, Eleve, Parents, VilleNaissance,
@@ -91,6 +93,8 @@ import { Residents } from './entities/residents.entity';
     PaiementsModule,
     EmploiModule,
     MessagerieModule,
+    VillesModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

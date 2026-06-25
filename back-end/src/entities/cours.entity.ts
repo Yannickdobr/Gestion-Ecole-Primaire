@@ -15,25 +15,25 @@ import { Classe } from './classe.entity';
  */
 @Entity('cours')
 export class Cours {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idCours: number;
 
   @Column({ type: 'varchar', length: 255 })
   libelle: string;
 
-  @Column({ type: 'float', unsigned: true, default: 0 })
+  @Column({ type: 'real', default: 0 })
   note: number; // note de passage
 
-  @Column({ type: 'float', unsigned: true, default: 1 })
+  @Column({ type: 'real', default: 1 })
   coefficient: number;
 
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   actif: number;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

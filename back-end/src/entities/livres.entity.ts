@@ -15,7 +15,7 @@ import {
    */
   @Entity('livres')
   export class Livres {
-    @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+    @PrimaryGeneratedColumn({ type: 'int' })
     idLivre: number;
   
     @Column({ type: 'varchar', length: 255 })
@@ -24,7 +24,7 @@ import {
     @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
     auteurs: string;
   
-    @Column({ type: 'float', unsigned: true, default: 0 })
+    @Column({ type: 'real', default: 0 })
     prix: number;
   
     @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
@@ -33,10 +33,10 @@ import {
     @Column({ type: 'date', nullable: true })
     annee_parution: Date;
   
-    @Column({ type: 'smallint', unsigned: true, default: 1 })
+    @Column({ type: 'smallint', default: 1 })
     totalCopie: number;
   
-    @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+    @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
     created_at: Date;
   
     // ─── Relations ────────────────────────────────────────────────────────

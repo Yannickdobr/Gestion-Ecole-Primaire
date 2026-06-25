@@ -11,15 +11,15 @@ import { Personne } from './personne.entity';
  * ✅ FIX: idAca est une FK vers AnneeAcademique dans la BD SQL (pas Trimestre)
  * La BD: ALTER TABLE Rapport ADD CONSTRAINT annee FK(idAca) REFERENCES AnneeAcademique(idAnnee)
  */
-@Entity('Rapport')
+@Entity('rapport')
 export class Rapport {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idRap: number;
 
   @Column({ type: 'varchar', length: 100 })
   libelle: string;
 
-  @Column({ type: 'int', unsigned: true })
+  @Column({ type: 'int' })
   points: number;
 
   @Column({ type: 'text' })
@@ -28,7 +28,7 @@ export class Rapport {
   @Column({ type: 'date' })
   event_date: Date;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Eleve, { eager: true, nullable: false })

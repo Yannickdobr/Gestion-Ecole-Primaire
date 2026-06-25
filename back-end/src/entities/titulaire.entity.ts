@@ -17,13 +17,13 @@ import { Salle } from './salle.entity';
  */
 @Entity('titulaire')
 export class Titulaire {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idTitulaire: number;
 
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1 })
+  @Column({ type: 'smallint', default: 1 })
   actif: number;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   // ─── Relations ────────────────────────────────────────────────────────

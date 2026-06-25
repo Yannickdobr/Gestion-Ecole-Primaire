@@ -65,6 +65,11 @@ export class CreateSessionDto {
   @IsInt()
   @IsNotEmpty({ message: "L'identifiant du trimestre est obligatoire" })
   idTrimestre: number;
+
+  // idPers (responsable) est NOT NULL en BD
+  @IsInt()
+  @IsNotEmpty({ message: "L'identifiant du responsable (personne) est obligatoire" })
+  idPers: number;
 }
 
 export class UpdateSessionDto {

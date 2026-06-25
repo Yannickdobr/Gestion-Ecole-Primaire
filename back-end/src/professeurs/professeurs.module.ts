@@ -6,10 +6,13 @@ import { Enseignant } from '../entities/enseignant.entity';
 import { Titulaire } from '../entities/titulaire.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
+import { Cours } from '../entities/cours.entity';
+import { Salle } from '../entities/salle.entity';
+import { Classe } from '../entities/classe.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Enseignant, Titulaire, Personne, Admin]),
+    TypeOrmModule.forFeature([Enseignant, Titulaire, Personne, Admin, Cours, Salle, Classe]),
   ],
   controllers: [ProfesseursController],
   providers: [ProfesseursService],

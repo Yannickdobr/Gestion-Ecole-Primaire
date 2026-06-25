@@ -158,20 +158,26 @@ import {
     // ══════════════════════════════════════════════════════════════════════════
   
     async createSalle(dto: CreateSalleDto): Promise<Salle> {
+      // Défauts pour les colonnes NOT NULL
       const salle = this.salleRepository.create({
         libelle: dto.libelle,
-        position: dto.position,
-        surface: dto.surface,
+        position: dto.position ?? 'INDEFINI',
+        surface: dto.surface ?? 'INDEFINI',
       });
       if (dto.idClasse) {
         const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
         if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
         salle.classe = classe;
       }
-      if (dto.idAdmin) {
-        const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
-        if (admin) salle.admin = admin;
+      // Admin : celui fourni, sinon l'admin racine par défaut
+      let admin = dto.idAdmin
+        ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+        : null;
+      if (!admin) {
+        const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+        admin = premier[0] ?? null;
       }
+      if (admin) salle.admin = admin;
       return this.salleRepository.save(salle);
     }
   
@@ -220,7 +226,8 @@ import {
   
       const annee = this.anneeRepository.create({
         libelle: dto.libelle,
-        periode: dto.periode,
+        periode: dto.periode ?? 'INDEFINI',
+        created_at: new Date(), // colonne NOT NULL sans défaut SQL en BD
       });
       if (dto.idAdmin) {
         const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
@@ -275,15 +282,49 @@ import {
         salle,
         anneeAcademique: annee,
         eleve,
-        commentaire: dto.commentaire,
+        commentaire: dto.commentaire ?? 'RAS', // NOT NULL en BD
       });
-      if (dto.idAdmin) {
-        const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
-        if (admin) frequente.admin = admin;
+      // Admin : fourni, sinon l'admin racine par défaut (idAdmin NOT NULL)
+      let admin = dto.idAdmin
+        ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+        : null;
+      if (!admin) {
+        const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+        admin = premier[0] ?? null;
       }
+      if (admin) frequente.admin = admin;
       return this.frequenteRepository.save(frequente);
     }
   
+    /**
+     * Réaffecte un élève dans une autre salle pour une année donnée.
+     * Met à jour la Frequente existante (pas de doublon, le calcul d'arriérés
+     * reste fiable). Si l'élève n'est pas encore affecté cette année, crée l'affectation.
+     */
+    async reaffecter(dto: CreateFrequenterDto): Promise<Frequente> {
+      const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule } });
+      if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${dto.matricule})`);
+      const salle = await this.findSalleById(dto.idSalle);
+
+      const courante = await this.frequenteRepository.findOne({
+        where: {
+          eleve: { matricule: dto.matricule },
+          anneeAcademique: { idAnnee: dto.idAcademi },
+        },
+      });
+
+      // Pas encore affecté cette année → affectation normale
+      if (!courante) return this.affecter(dto);
+
+      if (Number(courante.salle?.idSalle) === Number(dto.idSalle)) {
+        throw new ConflictException("L'élève est déjà dans cette salle pour cette année.");
+      }
+
+      courante.salle = salle;
+      if (dto.commentaire) courante.commentaire = dto.commentaire;
+      return this.frequenteRepository.save(courante);
+    }
+
     async findFrequenterByEleve(matricule: number): Promise<Frequente[]> {
       return this.frequenteRepository.find({
         where: { eleve: { matricule } },

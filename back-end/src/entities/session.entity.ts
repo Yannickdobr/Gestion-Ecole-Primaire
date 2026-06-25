@@ -10,18 +10,18 @@ import { Personne } from './personne.entity';
  * Entité Session
  * ✅ FIX: ajout de idPers (FK Personne) et created_at présents dans la BD
  */
-@Entity('Session')
+@Entity('session')
 export class Session {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idSession: number;
 
   @Column({ type: 'varchar', length: 255 })
   libelle: string;
 
-  @Column({ type: 'tinytext', nullable: true })
+  @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Trimestre, (trimestre) => trimestre.sessions, { eager: true, nullable: false })

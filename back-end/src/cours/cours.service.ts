@@ -193,11 +193,19 @@ export class CoursService {
       libelle: dto.libelle,
     });
 
-    if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
-      if (admin) specialite.admin = admin;
-    }
+    // idAdmin NOT NULL : admin fourni, sinon repli sur l'admin racine
+    specialite.admin = await this.resoudreAdmin(dto.idAdmin);
     return this.specialiteRepository.save(specialite);
+  }
+
+  /** Admin fourni, sinon repli sur l'admin racine (idAdmin NOT NULL en BD). */
+  private async resoudreAdmin(idAdmin?: number): Promise<Admin> {
+    if (idAdmin) {
+      const a = await this.adminRepository.findOne({ where: { ID: idAdmin } });
+      if (a) return a;
+    }
+    const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+    return premier[0];
   }
 
   async findAllSpecialites(): Promise<Specialite[]> {
@@ -247,18 +255,24 @@ export class CoursService {
       totalCopie: dto.totalCopie ?? 1,
     });
 
+    // specialite est NOT NULL en BD : celle fournie, sinon la première existante,
+    // sinon on crée une spécialité « Général » par défaut.
+    let spe: Specialite | null = null;
     if (dto.idSpecialite) {
-      const spe = await this.specialiteRepository.findOne({
-        where: { idSpecialite: dto.idSpecialite },
-      });
+      spe = await this.specialiteRepository.findOne({ where: { idSpecialite: dto.idSpecialite } });
       if (!spe) throw new NotFoundException(`Spécialité introuvable (id: ${dto.idSpecialite})`);
-      livre.specialite = spe;
+    } else {
+      spe = (await this.specialiteRepository.find({ order: { idSpecialite: 'ASC' }, take: 1 }))[0] ?? null;
+      if (!spe) {
+        spe = await this.specialiteRepository.save(
+          this.specialiteRepository.create({ libelle: 'Général', admin: await this.resoudreAdmin(dto.idAdmin) }),
+        );
+      }
     }
+    livre.specialite = spe;
 
-    if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
-      if (admin) livre.admin = admin;
-    }
+    // idAdmin NOT NULL : admin fourni, sinon repli sur l'admin racine
+    livre.admin = await this.resoudreAdmin(dto.idAdmin);
 
     return this.livresRepository.save(livre);
   }

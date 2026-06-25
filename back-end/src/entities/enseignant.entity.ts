@@ -5,24 +5,32 @@ import {
 import { Personne } from './personne.entity';
 import { Admin } from './admin.entity';
 import { Cours } from './cours.entity';
+import { Salle } from './salle.entity';
 
-@Entity('Enseignant')
+@Entity('enseignant')
 export class Enseignant {
-  @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
+  @PrimaryGeneratedColumn({ type: 'int' })
   idEnseignant: number;
 
   // ✅ FIX: SQL a "Actif" avec A majuscule — on spécifie le nom de colonne explicitement
-  @Column({ type: 'tinyint', unsigned: true, width: 1, default: 1, name: 'Actif' })
+  @Column({ type: 'smallint', default: 1, name: 'Actif' })
   actif: number;
 
-  @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 
   @ManyToOne(() => Personne, { eager: true, nullable: false })
   @JoinColumn({ name: 'idPers' })
   personne: Personne;
 
-  @ManyToOne(() => Cours, { eager: true, nullable: false })
+  // Salle attribuée à l'enseignant → détermine sa classe (salle.classe, eager).
+  // Il y donne toutes les matières (sauf la matière de difficulté ci-dessous).
+  @ManyToOne(() => Salle, { eager: true, nullable: true })
+  @JoinColumn({ name: 'idSalle' })
+  salle: Salle;
+
+  // Matière de DIFFICULTÉ (le cours qu'il NE donne PAS) — optionnel
+  @ManyToOne(() => Cours, { eager: true, nullable: true })
   @JoinColumn({ name: 'idCours' })
   cours: Cours;
 
