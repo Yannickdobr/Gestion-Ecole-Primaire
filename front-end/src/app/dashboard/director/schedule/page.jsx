@@ -555,8 +555,9 @@ function MobileView({ filteredSlots, selectedDay, setSelectedDay, viewMode, t, l
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════
 export default function SchedulePage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user } = useAuth();
+  const { anneeId, anneeLibelle } = useActiveYear();
 
   const [viewMode, setViewMode] = useState('class');    // 'class' | 'teacher' | 'room'
   const [selectedFilter, setSelectedFilter] = useState('');
