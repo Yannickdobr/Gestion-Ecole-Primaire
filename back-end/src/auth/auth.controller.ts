@@ -43,6 +43,14 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  @Post('forgot-password')
+  @UseGuards(LoginRateLimitGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mot de passe oublié', description: 'Régénère un mot de passe et l\'envoie par email (réponse générique)' })
+  forgotPassword(@Body() body: { username: string }) {
+    return this.authService.forgotPassword(body?.username);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)

@@ -12,9 +12,10 @@ export class CreateAdminDto {
   @MaxLength(50)
   username: string;
 
-  // 1 = Admin standard, 2 = Fondateur, 3 = Directeur (le Root ne se crée pas via l'API)
+  // 2 = Fondateur, 3 = Directeur (le Root ne se crée pas via l'API ;
+  // « Admin standard » (1) supprimé : les tâches de saisie relèvent du Personnel)
   @IsInt()
-  @IsIn([1, 2, 3], { message: 'typeAdmin doit être 1 (Admin), 2 (Fondateur) ou 3 (Directeur)' })
+  @IsIn([2, 3], { message: 'typeAdmin doit être 2 (Fondateur) ou 3 (Directeur)' })
   typeAdmin: number;
 
   @IsOptional()

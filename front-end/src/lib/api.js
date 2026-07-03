@@ -70,6 +70,7 @@ export function login(username, password) {
 export const getEleves = () => apiFetch("/eleves");
 export const getElevesActifs = () => apiFetch("/eleves/actifs");
 export const getEleve = (matricule) => apiFetch(`/eleves/${matricule}`);
+export const deleteEleve = (matricule) => apiFetch(`/eleves/${matricule}`, { method: "DELETE" });
 export const getElevesByParent = (idPers) =>
   apiFetch(`/eleves/parent/${idPers}`);
 export const affecterEleve = (data) =>
@@ -119,10 +120,12 @@ export const createCycle = (data) =>
   apiFetch("/classes/cycles", { method: "POST", body: JSON.stringify(data) });
 export const createClasse = (data) =>
   apiFetch("/classes", { method: "POST", body: JSON.stringify(data) });
+export const deleteClasse = (id) => apiFetch(`/classes/${id}`, { method: "DELETE" });
 export const createSalle = (data) =>
   apiFetch("/classes/salles", { method: "POST", body: JSON.stringify(data) });
 export const updateSalle = (id, data) =>
   apiFetch(`/classes/salles/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteSalle = (id) => apiFetch(`/classes/salles/${id}`, { method: "DELETE" });
 export const createCours = (data) =>
   apiFetch("/cours", { method: "POST", body: JSON.stringify(data) });
 

@@ -5,9 +5,9 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
   getCycles, getClasses, getCours, getSalles,
-  createCycle, createClasse, createCours, createSalle, updateSalle,
+  createCycle, createClasse, createCours, createSalle, updateSalle, deleteSalle, deleteClasse,
 } from "@/lib/api";
-import { Layers, Plus } from "lucide-react";
+import { Layers, Plus, Trash2 } from "lucide-react";
 import ManagerOnly from "@/components/ManagerOnly";
 
 const thStyle = { padding: "14px 22px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -127,6 +127,26 @@ function AcademicPage() {
     } catch (err) { setError(err.message || "Échec du changement de classe."); }
     finally { setEnvoi(false); }
   };
+  const handleSupprimerSalle = async (s) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer la salle "${s.libelle}" ?`)) return;
+    setEnvoi(true); setError("");
+    try {
+      await deleteSalle(s.idSalle);
+      await charger();
+    } catch (err) { setError(err.message || "Échec de la suppression."); }
+    finally { setEnvoi(false); }
+  };
+
+  const handleSupprimerClasse = async (c) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer la classe "${c.libelle}" ?`)) return;
+    setEnvoi(true); setError("");
+    try {
+      await deleteClasse(c.idClasse);
+      await charger();
+    } catch (err) { setError(err.message || "Échec de la suppression."); }
+    finally { setEnvoi(false); }
+  };
+
 
   const tabs = [
     { key: "cycles", label: "Cycles", count: cycles.length },
@@ -177,11 +197,19 @@ function AcademicPage() {
             </table>
           ) : tab === "classes" ? (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Classe</th><th style={thStyle}>Cycle</th></tr></thead>
+              <thead><tr><th style={thStyle}>Classe</th><th style={thStyle}>Cycle</th><th style={thStyle}>Actions</th></tr></thead>
               <tbody>
-                {classes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={2}>Aucune classe.</td></tr> :
+                {classes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={3}>Aucune classe.</td></tr> :
                   classes.map((c) => (
-                    <tr key={c.idClasse}><td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td><td style={{ ...tdStyle, color: "var(--muted)" }}>{c.cycle?.libelle || "—"}</td></tr>
+                    <tr key={c.idClasse}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
+                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.cycle?.libelle || "—"}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <button onClick={() => handleSupprimerClasse(c)} disabled={envoi} title="Supprimer la classe" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Trash2 size={14} /> Supprimer
+                        </button>
+                      </td>
+                    </tr>
                   ))}
               </tbody>
             </table>
@@ -197,9 +225,9 @@ function AcademicPage() {
             </table>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Salle</th><th style={thStyle}>Classe</th><th style={thStyle}>Surface</th></tr></thead>
+              <thead><tr><th style={thStyle}>Salle</th><th style={thStyle}>Classe</th><th style={thStyle}>Surface</th><th style={thStyle}>Actions</th></tr></thead>
               <tbody>
-                {salles.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={3}>Aucune salle.</td></tr> :
+                {salles.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={4}>Aucune salle.</td></tr> :
                   salles.map((s) => (
                     <tr key={s.idSalle}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{s.libelle}</td>
@@ -216,6 +244,11 @@ function AcademicPage() {
                         </select>
                       </td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{s.surface && s.surface !== "INDEFINI" ? s.surface : "—"}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <button onClick={() => handleSupprimerSalle(s)} disabled={envoi} title="Supprimer la salle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Trash2 size={14} /> Supprimer
+                        </button>
+                      </td>
                     </tr>
                   ))}
               </tbody>

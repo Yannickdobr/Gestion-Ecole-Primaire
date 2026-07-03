@@ -113,10 +113,10 @@ export class CreateEnseignantDto {
   @IsNotEmpty({ message: "L'identifiant de la personne est obligatoire" })
   idPers: number;
 
-  // Salle attribuée à l'enseignant (obligatoire) → sa classe en découle (salle.classe)
+  // Classe gérée par l'enseignant (obligatoire ; la salle affichée en découle)
   @IsInt()
-  @IsNotEmpty({ message: "L'identifiant de la salle est obligatoire" })
-  idSalle: number;
+  @IsNotEmpty({ message: "L'identifiant de la classe est obligatoire" })
+  idClasse: number;
 
   // Matière de difficulté (le cours qu'il ne donne pas) — optionnel
   @IsOptional()

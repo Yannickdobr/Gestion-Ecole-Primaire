@@ -16,6 +16,8 @@ import { EmploiModule } from './emploi/emploi.module';
 import { MessagerieModule } from './messagerie/messagerie.module';
 import { VillesModule } from './villes/villes.module';
 import { MailModule } from './mail/mail.module';
+import { AdministrationModule } from './administration/administration.module';
+import { UploadModule } from './upload/upload.module';
 
 // ─── Entités ──────────────────────────────────────────────────────────────────
 import { Admin } from './entities/admin.entity';
@@ -95,6 +97,8 @@ import { Residents } from './entities/residents.entity';
     MessagerieModule,
     VillesModule,
     MailModule,
+    AdministrationModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

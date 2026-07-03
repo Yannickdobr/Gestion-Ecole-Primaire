@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { EvaluationsService } from './evaluations.service';
@@ -164,6 +164,12 @@ export class EvaluationsController {
   @Get('rapports/eleve/:matricule')
   @ApiOperation({ summary: 'Bulletins d\'un élève (tous trimestres)' })
   findRapportsByEleve(@Param('matricule', ParseIntPipe) matricule: number) { return this.evaluationsService.findRapportsByEleve(matricule); }
+
+  @Get('rapports/stats-absences')
+  @ApiOperation({ summary: 'Assiduité : comptage des absences/retards (dérivé des rapports)' })
+  statsAbsences(@Query('idAca') idAca?: string) {
+    return this.evaluationsService.statsAbsences(idAca ? Number(idAca) : undefined);
+  }
 
   @Get('rapports/:id')
   @ApiOperation({ summary: 'Détail d\'un bulletin' })

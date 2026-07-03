@@ -6,9 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import {
   getEleves, createEleve, desactiverEleve, getVilles, seedVilles,
   getParentsEleve, createPersonne, addParentToEleve,
-  getSalles, getAnnees, affecterEleve, getFrequenteByEleve, reaffecterEleve,
+  getSalles, getAnnees, affecterEleve, getFrequenteByEleve, reaffecterEleve, deleteEleve,
 } from "@/lib/api";
-import { GraduationCap, Search, UserPlus, PowerOff, X, Users, Repeat } from "lucide-react";
+import { exporterCSV } from "@/lib/export";
+import FileUpload from "@/components/FileUpload";
+import { GraduationCap, Search, UserPlus, PowerOff, X, Users, Repeat, Eye, Download, Trash2 } from "lucide-react";
 
 function Avatar({ prenom = "", nom = "" }) {
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "?";
@@ -186,6 +188,20 @@ export default function StudentsPage() {
       setFormErreur(e.message || "Échec de l'inscription.");
     } finally {
       setEnvoi(false);
+    }
+  };
+
+  const handleSupprimerEleve = async (eleve) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer l'élève ${eleve.prenom} ${eleve.nom} ? Cette action est irréversible.`)) return;
+    setBusyId(eleve.matricule);
+    setError("");
+    try {
+      await deleteEleve(eleve.matricule);
+      await charger();
+    } catch (err) {
+      setError(err.message || "Échec de la suppression.");
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -407,6 +423,15 @@ export default function StudentsPage() {
                         >
                           <PowerOff size={14} />
                           {busyId === e.matricule ? "…" : "Désactiver"}
+                        </button>
+                        <button
+                          onClick={() => handleSupprimerEleve(e)}
+                          disabled={busyId === e.matricule}
+                          title="Supprimer définitivement l'élève"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          <Trash2 size={14} />
+                          {busyId === e.matricule ? "…" : "Supprimer"}
                         </button>
                       </div>
                     </td>
