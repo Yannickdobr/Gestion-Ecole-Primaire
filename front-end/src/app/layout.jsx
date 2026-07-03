@@ -3,6 +3,7 @@
 import "@/styles/global.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { ActiveYearProvider } from "@/context/ActiveYearContext";
 
 export default function RootLayout({ children }) {
   return (
@@ -17,7 +18,9 @@ export default function RootLayout({ children }) {
       <body>
         <LanguageProvider>
           <AuthProvider>
-            <main>{children}</main>
+            <ActiveYearProvider>
+              <main>{children}</main>
+            </ActiveYearProvider>
           </AuthProvider>
         </LanguageProvider>
       </body>

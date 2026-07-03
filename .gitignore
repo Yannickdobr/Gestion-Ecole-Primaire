@@ -1,0 +1,14 @@
+*.rar
+*.zip
+*.exe
+*.sql
+*.csv
+*.docx
+*.jpg
+*.png
+front-end/dev.err.log
+front-end/dev.out.log
+front-end/.vscode/
+front-end/dev.err.log
+front-end/dev.out.log
+repo_tmp/

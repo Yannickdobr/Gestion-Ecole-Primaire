@@ -150,8 +150,12 @@ export const getSalles = () => apiFetch("/classes/salles");
 export const getAnnees = () => apiFetch("/classes/annees");
 export const createCycle = (data) =>
   apiFetch("/classes/cycles", { method: "POST", body: JSON.stringify(data) });
+export const updateCycle = (id, data) =>
+  apiFetch(`/classes/cycles/${id}`, { method: "PUT", body: JSON.stringify(data) });
 export const createClasse = (data) =>
   apiFetch("/classes", { method: "POST", body: JSON.stringify(data) });
+export const updateClasse = (id, data) =>
+  apiFetch(`/classes/${id}`, { method: "PUT", body: JSON.stringify(data) });
 export const deleteClasse = (id) => apiFetch(`/classes/${id}`, { method: "DELETE" });
 export const createSalle = (data) =>
   apiFetch("/classes/salles", { method: "POST", body: JSON.stringify(data) });
@@ -160,11 +164,17 @@ export const updateSalle = (id, data) =>
 export const deleteSalle = (id) => apiFetch(`/classes/salles/${id}`, { method: "DELETE" });
 export const createCours = (data) =>
   apiFetch("/cours", { method: "POST", body: JSON.stringify(data) });
+export const updateCours = (id, data) =>
+  apiFetch(`/cours/${id}`, { method: "PUT", body: JSON.stringify(data) });
 
 export const getVilles = () => apiFetch("/villes");
 export const seedVilles = () => apiFetch("/villes/seed", { method: "POST" });
 
 export const getCours = () => apiFetch("/cours");
+export const getCoursParClasse = (idClasse) => apiFetch(`/cours/par-classe/${idClasse}`);
+// Matière de difficulté d'un enseignant (écrit idCours existant ; null pour effacer)
+export const setMatiereDifficulte = (idEnseignant, idCours) =>
+  apiFetch(`/professeurs/enseignants/${idEnseignant}/difficulte`, { method: "PATCH", body: JSON.stringify({ idCours: idCours ?? null }) });
 
 // ─── Bibliothèque (livres / spécialités) ───────────────────────────────────
 export const getLivres = () => apiFetch("/cours/livres");
@@ -183,6 +193,8 @@ export const getClassementSession = (idSession) =>
   apiFetch(`/evaluations/classement/session/${idSession}`);
 
 export const getEmploi = () => apiFetch("/emploi");
+// Plan d'intérim dérivé (échanges matière de difficulté ↔ intérimaire)
+export const getPlanInterim = () => apiFetch("/emploi/interim");
 export const getEmploiParClasse = (idClasse) =>
   apiFetch(`/emploi/classe/${idClasse}`);
 export const createEmploi = (data) =>

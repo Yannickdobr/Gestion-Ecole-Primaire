@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getElevesByParent, getNotesEleve, getPaiementsEleve, getMesMessages } from "@/lib/api";
+import { imprimerRecu } from "@/lib/print";
 import ChangePassword from "@/components/ChangePassword";
-import { LogOut, GraduationCap, BookOpen, Wallet, Mail } from "lucide-react";
+import { LogOut, GraduationCap, BookOpen, Wallet, Mail, Printer } from "lucide-react";
 
 function formatMontant(m: any) {
   const n = Number(m) || 0;
@@ -199,8 +200,25 @@ export default function ParentDashboard() {
                     <div style={{ fontSize: 13, opacity: 0.85 }}>Total versé</div>
                     <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "var(--font-display)" }}>{formatMontant(totalPaye)}</div>
                   </div>
-                  <div style={{ fontSize: 14, color: "var(--muted)" }}>
-                    {loadingDetail ? "Chargement…" : `${paiements.length} versement(s) enregistré(s)`}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", marginBottom: 8 }}>
+                    {loadingDetail ? "Chargement…" : `${paiements.length} versement(s)`}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {paiements.map((p, i) => (
+                      <div key={p.idPaie ?? i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 12px", borderRadius: 10, background: "#faf9f7", border: "1px solid var(--surface-border, #eee)" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-dark)" }}>{formatMontant(p.montant)}</div>
+                          <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{p.datePaie ? new Date(p.datePaie).toLocaleDateString("fr-FR") : "—"}{p.mode?.libelle ? ` · ${p.mode.libelle}` : ""}</div>
+                        </div>
+                        <button
+                          onClick={() => imprimerRecu({ eleve: selection, paiement: p, classe: undefined, annee: undefined })}
+                          title="Imprimer le reçu"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 9, border: "1px solid var(--surface-border, #eee)", background: "var(--surface, #fff)", color: "var(--orange)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}
+                        >
+                          <Printer size={13} /> Reçu
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

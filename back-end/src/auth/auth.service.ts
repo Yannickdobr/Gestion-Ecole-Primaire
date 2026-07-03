@@ -273,6 +273,10 @@ import {
       }
       const admin = await this.adminRepository.findOne({ where: { ID: targetId } });
       if (!admin) throw new NotFoundException('Administrateur introuvable');
+      // Le compte Root (typeAdmin 0) est protégé : personne ne peut le supprimer.
+      if (Number(admin.typeAdmin) === 0) {
+        throw new ForbiddenException('Le compte Root est protégé et ne peut pas être supprimé.');
+      }
       try {
         await this.adminRepository.remove(admin);
       } catch {

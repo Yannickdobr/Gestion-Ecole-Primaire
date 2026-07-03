@@ -286,6 +286,31 @@ export class ProfesseursService {
   }
 
   /**
+   * Définir (ou effacer) la « matière de difficulté » d'un enseignant.
+   * Écrit uniquement la colonne existante idCours — aucune modif de schéma.
+   * La matière doit appartenir à la classe de l'enseignant.
+   */
+  async setMatiereDifficulte(idEnseignant: number, idCours: number | null): Promise<Enseignant> {
+    const ens = await this.enseignantRepository.findOne({
+      where: { idEnseignant },
+      relations: ['classe'],
+    });
+    if (!ens) throw new NotFoundException(`Enseignant introuvable (id: ${idEnseignant})`);
+
+    if (idCours == null) {
+      ens.cours = null as any; // efface la matière de difficulté
+    } else {
+      const cours = await this.coursRepository.findOne({ where: { idCours }, relations: ['classe'] });
+      if (!cours) throw new NotFoundException(`Cours introuvable (id: ${idCours})`);
+      if (ens.classe && cours.classe && Number(cours.classe.idClasse) !== Number(ens.classe.idClasse)) {
+        throw new ConflictException("La matière de difficulté doit appartenir à la classe de l'enseignant.");
+      }
+      ens.cours = cours;
+    }
+    return this.enseignantRepository.save(ens);
+  }
+
+  /**
    * Lister tous les enseignants
    */
   async findAllEnseignants(): Promise<Enseignant[]> {
@@ -400,6 +425,31 @@ export class ProfesseursService {
     }
     if (admin) titulaire.admin = admin;
 
+    return this.titulaireRepository.save(titulaire);
+  }
+
+  /**
+   * Modifier la salle d'un titulaire (réaffectation).
+   */
+  async updateTitulaire(idTitulaire: number, idSalle: number): Promise<Titulaire> {
+    const titulaire = await this.titulaireRepository.findOne({
+      where: { idTitulaire },
+      relations: ['personne', 'salle'],
+    });
+    if (!titulaire) throw new NotFoundException(`Titulaire introuvable (id: ${idTitulaire})`);
+    const salle = await this.salleRepository.findOne({ where: { idSalle } });
+    if (!salle) throw new NotFoundException(`Salle introuvable (id: ${idSalle})`);
+
+    // La nouvelle salle ne doit pas déjà avoir un autre titulaire actif
+    if (Number(titulaire.salle?.idSalle) !== Number(idSalle)) {
+      const deja = await this.titulaireRepository.findOne({
+        where: { salle: { idSalle }, actif: 1 },
+      });
+      if (deja && Number(deja.idTitulaire) !== Number(idTitulaire)) {
+        throw new ConflictException("Cette salle a déjà un titulaire actif.");
+      }
+    }
+    titulaire.salle = salle;
     return this.titulaireRepository.save(titulaire);
   }
 

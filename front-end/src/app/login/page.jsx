@@ -2,7 +2,7 @@
 import { Eye, EyeClosed } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login as apiLogin } from "@/lib/api";
+import { login as apiLogin, forgotPassword } from "@/lib/api";
 import { homePathFor } from "@/lib/roles";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -14,6 +14,26 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth(); // 2. Grab the login function
+
+  // Mot de passe oublié
+  const [fpOpen, setFpOpen] = useState(false);
+  const [fpUsername, setFpUsername] = useState("");
+  const [fpMsg, setFpMsg] = useState("");
+  const [fpLoading, setFpLoading] = useState(false);
+
+  const soumettreOubli = async (e) => {
+    e.preventDefault();
+    setFpLoading(true);
+    setFpMsg("");
+    try {
+      const r = await forgotPassword(fpUsername.trim());
+      setFpMsg(r?.message || "Si un compte correspond, un email a été envoyé.");
+    } catch (err) {
+      setFpMsg(err.message || "Une erreur est survenue.");
+    } finally {
+      setFpLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -205,17 +225,23 @@ export default function LoginPage() {
                   >
                     Mot de passe
                   </label>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={() => { setFpUsername(username); setFpMsg(""); setFpOpen(true); }}
                     style={{
                       fontSize: 12,
                       color: "#d86310",
                       textDecoration: "none",
                       fontWeight: 500,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      padding: 0,
                     }}
                   >
                     Mot de passe oublié ?
-                  </a>
+                  </button>
                 </div>
                 <div style={{ position: "relative" }}>
                   <input
@@ -662,6 +688,38 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Modal : Mot de passe oublié ── */}
+      {fpOpen && (
+        <div
+          onClick={() => !fpLoading && setFpOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "#fff", borderRadius: 18, padding: 26, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#1a1208", fontFamily: "var(--font-display)", marginBottom: 6 }}>Mot de passe oublié</h2>
+            <p style={{ fontSize: 13, color: "#8a7060", marginBottom: 16 }}>
+              Saisis ton identifiant (email). Si un compte existe, un nouveau mot de passe te sera envoyé par email.
+            </p>
+            <form onSubmit={soumettreOubli}>
+              <input
+                type="text"
+                value={fpUsername}
+                onChange={(e) => setFpUsername(e.target.value)}
+                placeholder="ton.email@exemple.com"
+                autoComplete="username"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "1.5px solid rgba(26,18,8,0.12)", fontSize: 14, background: "#faf9f7", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+              />
+              {fpMsg && (
+                <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)", fontSize: 13, color: "#15803d" }}>{fpMsg}</div>
+              )}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                <button type="button" onClick={() => setFpOpen(false)} disabled={fpLoading} style={{ padding: "10px 18px", borderRadius: 10, border: "1.5px solid rgba(26,18,8,0.12)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Fermer</button>
+                <button type="submit" disabled={fpLoading || !fpUsername.trim()} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: (fpLoading || !fpUsername.trim()) ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, #d86310, #ac3b02)", color: "white", fontSize: 14, fontWeight: 600, cursor: (fpLoading || !fpUsername.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{fpLoading ? "Envoi…" : "Réinitialiser"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
