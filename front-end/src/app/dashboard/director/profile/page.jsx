@@ -9,15 +9,15 @@ import { UserCheck, ShieldCheck, ShieldAlert } from "lucide-react";
 // Libellés lisibles selon le rôle et le type
 function libelleRole(role, typeRole) {
   if (role === "admin") {
-    return { 0: "Root", 1: "Administrateur", 2: "Fondateur", 3: "Directeur" }[typeRole] || "Administrateur";
+    return { 0: "Root", 1: "Admin standard (déprécié)", 2: "Fondateur", 3: "Directeur" }[typeRole] || "Administrateur";
   }
   if (role === "personne") {
     return {
       1: "Enseignant",
-      2: "Personnel administratif",
-      3: "Scolarité",
+      2: "Administratif (secrétariat)",
+      3: "Scolarité (inscriptions)",
       4: "Parent",
-      5: "Autre",
+      5: "Autres",
     }[typeRole] || "Personne";
   }
   return role || "—";

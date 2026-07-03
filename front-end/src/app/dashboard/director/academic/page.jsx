@@ -5,9 +5,10 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
   getCycles, getClasses, getCours, getSalles,
-  createCycle, createClasse, createCours, createSalle, updateSalle, deleteSalle, deleteClasse,
+  createCycle, createClasse, createCours, createSalle,
+  updateCycle, updateClasse, updateCours, updateSalle, deleteSalle, deleteClasse,
 } from "@/lib/api";
-import { Layers, Plus, Trash2 } from "lucide-react";
+import { Layers, Plus, Trash2, Pencil, X } from "lucide-react";
 import ManagerOnly from "@/components/ManagerOnly";
 
 const thStyle = { padding: "14px 22px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -37,6 +38,37 @@ function AcademicPage() {
   const [fClasse, setFClasse] = useState({ libelle: "", idCycle: "" });
   const [fCours, setFCours] = useState({ libelle: "", description: "", coefficient: "1", idClasse: "" });
   const [fSalle, setFSalle] = useState({ libelle: "", surface: "", position: "", idClasse: "" });
+
+  // Édition (modal générique)
+  const [editItem, setEditItem] = useState(null); // { type, id }
+  const [editForm, setEditForm] = useState({});
+  const [editErr, setEditErr] = useState("");
+
+  const ouvrirEdit = (type, item) => {
+    setEditErr("");
+    if (type === "cycle") setEditForm({ libelle: item.libelle || "", description: item.description && item.description !== "INDEFINI" ? item.description : "" });
+    if (type === "classe") setEditForm({ libelle: item.libelle || "", idCycle: item.cycle?.idCycle ? String(item.cycle.idCycle) : "" });
+    if (type === "cours") setEditForm({ libelle: item.libelle || "", coefficient: String(item.coefficient ?? 1), description: item.description && item.description !== "INDEFINI" ? item.description : "", idClasse: item.classe?.idClasse ? String(item.classe.idClasse) : "" });
+    if (type === "salle") setEditForm({ libelle: item.libelle || "", surface: item.surface && item.surface !== "INDEFINI" ? item.surface : "", position: item.position && item.position !== "INDEFINI" ? item.position : "", idClasse: item.classe?.idClasse ? String(item.classe.idClasse) : "" });
+    setEditItem({ type, id: item.idCycle ?? item.idClasse ?? item.idCours ?? item.idSalle });
+  };
+
+  const enregistrerEdit = async (e) => {
+    e.preventDefault();
+    setEditErr("");
+    const { type, id } = editItem;
+    if (!editForm.libelle?.trim()) { setEditErr("Le libellé est requis."); return; }
+    setEnvoi(true);
+    try {
+      if (type === "cycle") await updateCycle(id, { libelle: editForm.libelle.trim(), description: editForm.description?.trim() || "INDEFINI" });
+      if (type === "classe") { if (!editForm.idCycle) { setEditErr("Cycle requis."); setEnvoi(false); return; } await updateClasse(id, { libelle: editForm.libelle.trim(), idCycle: Number(editForm.idCycle) }); }
+      if (type === "cours") { if (!editForm.idClasse) { setEditErr("Classe requise."); setEnvoi(false); return; } await updateCours(id, { libelle: editForm.libelle.trim(), coefficient: Number(editForm.coefficient) || 1, description: editForm.description?.trim() || "INDEFINI", idClasse: Number(editForm.idClasse) }); }
+      if (type === "salle") { if (!editForm.idClasse) { setEditErr("Classe requise."); setEnvoi(false); return; } await updateSalle(id, { libelle: editForm.libelle.trim(), surface: editForm.surface?.trim() || "INDEFINI", position: editForm.position?.trim() || "INDEFINI", idClasse: Number(editForm.idClasse) }); }
+      setEditItem(null);
+      await charger();
+    } catch (err) { setEditErr(err.message || "Échec de la modification."); }
+    finally { setEnvoi(false); }
+  };
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -187,11 +219,15 @@ function AcademicPage() {
             <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Chargement…</div>
           ) : tab === "cycles" ? (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Cycle</th><th style={thStyle}>Description</th></tr></thead>
+              <thead><tr><th style={thStyle}>Cycle</th><th style={thStyle}>Description</th><th style={{ ...thStyle, textAlign: "right" }}>Actions</th></tr></thead>
               <tbody>
-                {cycles.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={2}>Aucun cycle.</td></tr> :
+                {cycles.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={3}>Aucun cycle.</td></tr> :
                   cycles.map((c) => (
-                    <tr key={c.idCycle}><td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td><td style={{ ...tdStyle, color: "var(--muted)" }}>{c.description && c.description !== "INDEFINI" ? c.description : "—"}</td></tr>
+                    <tr key={c.idCycle}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
+                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.description && c.description !== "INDEFINI" ? c.description : "—"}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}><BtnEdit onClick={() => ouvrirEdit("cycle", c)} /></td>
+                    </tr>
                   ))}
               </tbody>
             </table>
@@ -205,9 +241,12 @@ function AcademicPage() {
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.cycle?.libelle || "—"}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>
-                        <button onClick={() => handleSupprimerClasse(c)} disabled={envoi} title="Supprimer la classe" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                          <Trash2 size={14} /> Supprimer
-                        </button>
+                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                          <BtnEdit onClick={() => ouvrirEdit("classe", c)} />
+                          <button onClick={() => handleSupprimerClasse(c)} disabled={envoi} title="Supprimer la classe" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            <Trash2 size={14} /> Supprimer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -215,11 +254,16 @@ function AcademicPage() {
             </table>
           ) : tab === "cours" ? (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Classe</th><th style={thStyle}>Coef.</th></tr></thead>
+              <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Classe</th><th style={thStyle}>Coef.</th><th style={{ ...thStyle, textAlign: "right" }}>Actions</th></tr></thead>
               <tbody>
-                {cours.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={3}>Aucun cours.</td></tr> :
+                {cours.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={4}>Aucun cours.</td></tr> :
                   cours.map((c) => (
-                    <tr key={c.idCours}><td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td><td style={{ ...tdStyle, color: "var(--muted)" }}>{c.classe?.libelle || "—"}</td><td style={{ ...tdStyle, color: "var(--muted)" }}>{c.coefficient}</td></tr>
+                    <tr key={c.idCours}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
+                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.classe?.libelle || "—"}</td>
+                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.coefficient}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}><BtnEdit onClick={() => ouvrirEdit("cours", c)} /></td>
+                    </tr>
                   ))}
               </tbody>
             </table>
@@ -245,9 +289,12 @@ function AcademicPage() {
                       </td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{s.surface && s.surface !== "INDEFINI" ? s.surface : "—"}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>
-                        <button onClick={() => handleSupprimerSalle(s)} disabled={envoi} title="Supprimer la salle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                          <Trash2 size={14} /> Supprimer
-                        </button>
+                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                          <BtnEdit onClick={() => ouvrirEdit("salle", s)} />
+                          <button onClick={() => handleSupprimerSalle(s)} disabled={envoi} title="Supprimer la salle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            <Trash2 size={14} /> Supprimer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -322,7 +369,74 @@ function AcademicPage() {
           )}
         </div>
       </div>
+
+      {/* ── Modal d'édition ── */}
+      {editItem && (
+        <div onClick={() => !envoi && setEditItem(null)} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: "#fff", borderRadius: 20, padding: 26, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>
+                Modifier {editItem.type === "cycle" ? "le cycle" : editItem.type === "classe" ? "la classe" : editItem.type === "cours" ? "le cours" : "la salle"}
+              </h2>
+              <button onClick={() => setEditItem(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={enregistrerEdit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div><label style={labelStyle}>Libellé *</label><input style={inputStyle} value={editForm.libelle || ""} onChange={(e) => setEditForm((f) => ({ ...f, libelle: e.target.value }))} /></div>
+
+              {editItem.type === "cycle" && (
+                <div><label style={labelStyle}>Description</label><input style={inputStyle} value={editForm.description || ""} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} /></div>
+              )}
+              {editItem.type === "classe" && (
+                <div><label style={labelStyle}>Cycle *</label>
+                  <select style={inputStyle} value={editForm.idCycle || ""} onChange={(e) => setEditForm((f) => ({ ...f, idCycle: e.target.value }))}>
+                    <option value="">— Choisir —</option>
+                    {cycles.map((c) => <option key={c.idCycle} value={c.idCycle}>{c.libelle}</option>)}
+                  </select>
+                </div>
+              )}
+              {editItem.type === "cours" && (<>
+                <div><label style={labelStyle}>Classe *</label>
+                  <select style={inputStyle} value={editForm.idClasse || ""} onChange={(e) => setEditForm((f) => ({ ...f, idClasse: e.target.value }))}>
+                    <option value="">— Choisir —</option>
+                    {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div><label style={labelStyle}>Coefficient</label><input type="number" min="0" step="0.5" style={inputStyle} value={editForm.coefficient || ""} onChange={(e) => setEditForm((f) => ({ ...f, coefficient: e.target.value }))} /></div>
+                </div>
+                <div><label style={labelStyle}>Description</label><input style={inputStyle} value={editForm.description || ""} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} /></div>
+              </>)}
+              {editItem.type === "salle" && (<>
+                <div><label style={labelStyle}>Classe *</label>
+                  <select style={inputStyle} value={editForm.idClasse || ""} onChange={(e) => setEditForm((f) => ({ ...f, idClasse: e.target.value }))}>
+                    <option value="">— Choisir —</option>
+                    {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div><label style={labelStyle}>Surface</label><input style={inputStyle} value={editForm.surface || ""} onChange={(e) => setEditForm((f) => ({ ...f, surface: e.target.value }))} /></div>
+                  <div><label style={labelStyle}>Position</label><input style={inputStyle} value={editForm.position || ""} onChange={(e) => setEditForm((f) => ({ ...f, position: e.target.value }))} /></div>
+                </div>
+              </>)}
+
+              {editErr && <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 13 }}>{editErr}</div>}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                <button type="button" onClick={() => setEditItem(null)} disabled={envoi} style={{ padding: "11px 20px", borderRadius: 12, border: "1.5px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                <button type="submit" disabled={envoi} style={{ padding: "11px 24px", borderRadius: 12, border: "none", background: envoi ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{envoi ? "Enregistrement…" : "Enregistrer"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function BtnEdit({ onClick }) {
+  return (
+    <button onClick={onClick} title="Modifier" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+      <Pencil size={14} /> Modifier
+    </button>
   );
 }
 

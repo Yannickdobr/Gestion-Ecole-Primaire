@@ -69,6 +69,10 @@ export class EmploiController {
   @ApiQuery({ name: 'jour', required: true, example: 'Lundi' })
   findByJour(@Query('jour') jour: string) { return this.emploiService.findByJour(jour ?? 'Lundi'); }
 
+  @Get('interim')
+  @ApiOperation({ summary: 'Plan d\'intérim dérivé (échanges matière de difficulté ↔ intérimaire)' })
+  planInterim() { return this.emploiService.planInterim(); }
+
   @Get(':id')
   @ApiOperation({ summary: 'Détail d\'un créneau' })
   findCreneau(@Param('id', ParseIntPipe) id: number) { return this.emploiService.findCreneauById(id); }

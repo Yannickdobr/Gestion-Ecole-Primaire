@@ -9,6 +9,7 @@ import {
   createAnnee, createTrimestre, createSession, createNature, createEpreuve,
 } from "@/lib/api";
 import { ClipboardCheck, Plus, X, Zap } from "lucide-react";
+import FileUpload from "@/components/FileUpload";
 
 const inputStyle = { width: "100%", padding: "10px 13px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 5 };
@@ -61,7 +62,7 @@ export default function GradesPage() {
   const [fTrim, setFTrim] = useState({ libelle: "", periode: "", idAca: "" });
   const [fSess, setFSess] = useState({ libelle: "", idTrimestre: "", idPers: "" });
   const [fNat, setFNat] = useState({ libelle: "" });
-  const [fEpr, setFEpr] = useState({ libelle: "", idNature: "", idPers: "" });
+  const [fEpr, setFEpr] = useState({ libelle: "", idNature: "", idPers: "", urlDoc: "" });
 
   const chargerTout = useCallback(async () => {
     setError("");
@@ -102,7 +103,7 @@ export default function GradesPage() {
   const addNat = (e) => { e.preventDefault(); if (!fNat.libelle.trim()) return;
     submit(() => createNature({ libelle: fNat.libelle.trim() }), () => setFNat({ libelle: "" })); };
   const addEpr = (e) => { e.preventDefault(); if (!fEpr.libelle.trim() || !fEpr.idNature || !fEpr.idPers) { setError("Libellé, nature et auteur requis."); return; }
-    submit(() => createEpreuve({ libelle: fEpr.libelle.trim(), idNature: Number(fEpr.idNature), idPers: Number(fEpr.idPers) }), () => setFEpr({ libelle: "", idNature: "", idPers: "" })); };
+    submit(() => createEpreuve({ libelle: fEpr.libelle.trim(), idNature: Number(fEpr.idNature), idPers: Number(fEpr.idPers), urlDoc: fEpr.urlDoc || undefined }), () => setFEpr({ libelle: "", idNature: "", idPers: "", urlDoc: "" })); };
 
   // ── Saisie d'une note ──
   const soumettreNote = async (e) => {
@@ -330,6 +331,7 @@ export default function GradesPage() {
                   {personnes.map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
                 </select>
               </Field>
+              <Field label="Document (sujet)"><FileUpload value={fEpr.urlDoc} onUploaded={(url) => setFEpr((s) => ({ ...s, urlDoc: url }))} accept=".pdf,.doc,.docx,image/*" label="Joindre le sujet" /></Field>
               <Btn envoi={envoi} disabled={natures.length === 0 || personnes.length === 0} hint={natures.length === 0 ? "Crée d'abord une nature." : ""} />
             </form>
           </RefCard>

@@ -10,6 +10,7 @@ import { JourSemaine } from '../entities/jour-semaine.entity';
 import { Classe } from '../entities/classe.entity';
 import { Cours } from '../entities/cours.entity';
 import { Admin } from '../entities/admin.entity';
+import { Enseignant } from '../entities/enseignant.entity';
 import {
   CreateEmploiDuTempsDto,
   UpdateEmploiDuTempsDto,
@@ -34,7 +35,77 @@ export class EmploiService {
 
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
+
+    @InjectRepository(Enseignant)
+    private enseignantRepository: Repository<Enseignant>,
   ) {}
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PLAN D'INTÉRIM (dérivé — aucune donnée stockée en plus)
+  //
+  // Un enseignant A (titulaire de sa classe) n'assure pas sa « matière de
+  // difficulté » (enseignant.idCours). Pour chaque créneau où sa classe
+  // programme cette matière, on cherche AUTOMATIQUEMENT un partenaire B libre
+  // à la même heure, et on propose un ÉCHANGE réciproque :
+  //   - B assure la matière de A dans la classe de A,
+  //   - A assure, à la même heure, la matière de B dans la classe de B.
+  // Tout est calculé à la volée à partir de l'emploi + de la table Enseignant.
+  // ══════════════════════════════════════════════════════════════════════════
+  async planInterim(): Promise<any[]> {
+    const [creneaux, enseignants] = await Promise.all([
+      this.emploiRepository.find({ relations: ['classe', 'cours'] }),
+      this.enseignantRepository.find({ where: { actif: 1 }, relations: ['personne', 'classe', 'cours'] }),
+    ]);
+
+    // classe → enseignant titulaire (1 enseignant polyvalent par classe)
+    const profParClasse = new Map<number, Enseignant>();
+    for (const e of enseignants) {
+      const idc = e.classe?.idClasse;
+      if (idc != null && !profParClasse.has(Number(idc))) profParClasse.set(Number(idc), e);
+    }
+    const difficulteDe = (e?: Enseignant) => (e?.cours?.idCours != null ? Number(e.cours.idCours) : null);
+    const info = (e?: Enseignant) => e ? { idEnseignant: e.idEnseignant, idPers: e.personne?.idPers, nom: e.personne?.nom, prenom: e.personne?.prenom } : null;
+
+    const plan: any[] = [];
+    for (const c of creneaux) {
+      const idClasseA = Number(c.classe?.idClasse);
+      const A = profParClasse.get(idClasseA);
+      const DA = difficulteDe(A);
+      // Créneau « à problème » : la matière programmée = la matière de difficulté du titulaire
+      if (A == null || DA == null || Number(c.cours?.idCours) !== DA) continue;
+
+      // Recherche automatique d'un partenaire B libre/compatible à la même heure
+      let match: { B: Enseignant; cB: EmploiDuTemps; X: number } | null = null;
+      for (const c2 of creneaux) {
+        if (c2.idTemps === c.idTemps) continue;
+        if (c2.jour !== c.jour || c2.heure !== c.heure) continue;
+        const idClasseB = Number(c2.classe?.idClasse);
+        if (idClasseB === idClasseA) continue;
+        const B = profParClasse.get(idClasseB);
+        if (!B || Number(B.idEnseignant) === Number(A.idEnseignant)) continue;
+        const X = Number(c2.cours?.idCours);
+        const DB = difficulteDe(B);
+        if (X === DA) continue;             // A doit pouvoir enseigner X
+        if (DB != null && DA === DB) continue; // B doit pouvoir enseigner DA
+        if (DB != null && X === DB) continue;  // X ne doit pas être la difficulté de B (sinon B ne l'assure pas)
+        match = { B, cB: c2, X };
+        break;
+      }
+
+      plan.push({
+        jour: c.jour,
+        heure: c.heure,
+        classeConcernee: { idClasse: idClasseA, libelle: c.classe?.libelle },
+        matiereDifficulte: { idCours: DA, libelle: c.cours?.libelle },
+        enseignantEnDifficulte: info(A),
+        interimaire: match ? info(match.B) : null,
+        classeInterimaire: match ? { idClasse: Number(match.cB.classe?.idClasse), libelle: match.cB.classe?.libelle } : null,
+        matiereContrepartie: match ? { idCours: match.X, libelle: match.cB.cours?.libelle } : null,
+        conflit: !match, // aucun intérimaire compatible à cette heure
+      });
+    }
+    return plan;
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // JOURS DE SEMAINE

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -35,7 +36,7 @@ const tdStyle = { padding: "16px 24px", fontSize: 14, color: "var(--text-dark)",
 const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 6 };
 
-const FORM_VIDE = { nom: "", prenom: "", dateNaissance: "", sexe: "1", lieuNaissance: "", langue: "", idVilleNaissance: "", idSalle: "", idAca: "" };
+const FORM_VIDE = { nom: "", prenom: "", dateNaissance: "", sexe: "1", lieuNaissance: "", langue: "", idVilleNaissance: "", idSalle: "", idAca: "", photoURL: "" };
 const PARENT_VIDE = { nom: "", prenom: "", username: "", mobile: "" };
 
 function formatDate(d) {
@@ -159,6 +160,7 @@ export default function StudentsPage() {
     if (form.lieuNaissance.trim()) payload.lieuNaissance = form.lieuNaissance.trim();
     if (form.langue.trim()) payload.langue = form.langue.trim();
     if (form.idVilleNaissance) payload.idVilleNaissance = Number(form.idVilleNaissance);
+    if (form.photoURL) payload.photoURL = form.photoURL;
     // L'élève est rattaché à l'admin connecté
     if (user?.role === "admin" && user?.id) payload.idAdmin = Number(user.id);
 
@@ -272,6 +274,22 @@ export default function StudentsPage() {
     }
   };
 
+  // ── Export CSV de la liste (filtrée) ──
+  const exporter = () => {
+    exporterCSV(
+      elevesFiltres,
+      [
+        { key: "matricule", label: "Matricule" },
+        { key: "nom", label: "Nom" },
+        { key: "prenom", label: "Prénom" },
+        { get: (e) => (Number(e.sexe) === 2 ? "Féminin" : "Masculin"), label: "Sexe" },
+        { get: (e) => (e.dateNaissance ? new Date(e.dateNaissance).toLocaleDateString("fr-FR") : ""), label: "Naissance" },
+        { get: (e) => (Number(e.actif) === 1 ? "Actif" : "Inactif"), label: "Statut" },
+      ],
+      `eleves_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+  };
+
   // ── Réaffectation (changement de classe/salle) ──
   const classesDispo = useMemo(() => {
     const map = new Map();
@@ -339,12 +357,21 @@ export default function StudentsPage() {
           </span>
         </div>
 
-        <button
-          onClick={() => { setForm(FORM_VIDE); setFormErreur(""); setModalOuvert(true); }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", boxShadow: "0 4px 12px rgba(216,99,16,0.25)" }}
-        >
-          <UserPlus size={16} /> Inscrire un élève
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={exporter}
+            disabled={elevesFiltres.length === 0}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 16px", borderRadius: 12, border: "1px solid var(--surface-border)", cursor: elevesFiltres.length === 0 ? "not-allowed" : "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "var(--surface)", color: "var(--text-dark)" }}
+          >
+            <Download size={16} /> Exporter CSV
+          </button>
+          <button
+            onClick={() => { setForm(FORM_VIDE); setFormErreur(""); setModalOuvert(true); }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", boxShadow: "0 4px 12px rgba(216,99,16,0.25)" }}
+          >
+            <UserPlus size={16} /> Inscrire un élève
+          </button>
+        </div>
       </div>
 
       {/* Recherche */}
@@ -402,6 +429,13 @@ export default function StudentsPage() {
                     <td style={tdStyle}><StatutBadge actif={e.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                        <Link
+                          href={`/dashboard/director/eleve/${e.matricule}`}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", textDecoration: "none" }}
+                        >
+                          <Eye size={14} />
+                          Fiche
+                        </Link>
                         <button
                           onClick={() => ouvrirParents(e)}
                           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
@@ -529,6 +563,11 @@ export default function StudentsPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <label style={labelStyle}>Photo de l'élève</label>
+                <FileUpload value={form.photoURL} onUploaded={(url) => majForm("photoURL", url)} accept="image/*" apercu label="Choisir une photo" />
               </div>
 
               <p style={{ fontSize: 12, color: "#8a7060", marginTop: 10 }}>

@@ -5,19 +5,29 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 import { ChartWidget } from '@/components/ui/ChartWidget';
 import { MetricStat } from '@/components/ui/MetricStat';
 import { TableWidget } from '@/components/ui/TableWidget';
-import { getEleves, getEnseignants, getClasses } from '@/lib/api';
+import { getEleves, getEnseignants, getClasses, getStatsAbsences } from '@/lib/api';
 import { HelpCircle, Monitor, PieChart, Users, GraduationCap, AlertTriangle } from 'lucide-react';
 import { useLanguage } from "@/context/LanguageContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
 
 export default function DirectorDashboard() {
   // t = dictionnaire de la langue courante (src/messages/{fr,en}.js)
   const { t } = useLanguage();
+  const { anneeId } = useActiveYear();
 
   // ─── Données réelles depuis l'API ───────────────────────────────────────
   const [kpis, setKpis] = useState({ totalEleves: 0, totalEnseignants: 0, totalClasses: 0 });
+  const [absences, setAbsences] = useState(null);
   const [rapports, setRapports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Assiduité (dérivée des rapports) — recalculée quand l'année active change
+  useEffect(() => {
+    let actif = true;
+    getStatsAbsences(anneeId).then((s) => { if (actif) setAbsences(s); }).catch(() => {});
+    return () => { actif = false; };
+  }, [anneeId]);
 
   useEffect(() => {
     let actif = true;
@@ -108,8 +118,8 @@ export default function DirectorDashboard() {
           />
 
           <MetricStat
-            value={"—"}
-            label={t?.kpi_attendance || "Taux de présence"}
+            value={absences ? absences.total : "…"}
+            label="Absences / retards consignés"
             icon={<Monitor size={20} />}
           />
         </div>

@@ -25,8 +25,8 @@ import {
 import { Users, GraduationCap, UserCheck, Power, PowerOff, UserPlus, X, MapPin, Shield, Trash2 } from "lucide-react";
 
 // Libellés de rôle (Personne.typePersonne et Admin.typeAdmin)
-const TYPE_PERSONNE = { 1: "Enseignant", 2: "Administratif", 3: "Scolarité", 4: "Parent", 5: "Autres" };
-const TYPE_ADMIN = { 0: "Root", 1: "Admin", 2: "Fondateur", 3: "Directeur" };
+const TYPE_PERSONNE = { 1: "Enseignant", 2: "Administratif (secrétariat)", 3: "Scolarité (inscriptions)", 4: "Parent", 5: "Autres" };
+const TYPE_ADMIN = { 0: "Root", 1: "Admin standard (déprécié)", 2: "Fondateur", 3: "Directeur" };
 
 const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 6 };
@@ -171,13 +171,14 @@ function StaffPage() {
   // Root (0) et Fondateur (2) peuvent supprimer n'importe qui, y compris des admins
   const estRootOuFondateur = user?.role === "admin" && [0, 2].includes(Number(user?.typeRole));
 
-  // Types d'admin que le compte connecté peut créer
-  // Root (0) → Fondateur, Directeur, Admin standard ; Fondateur (2) → Directeur, Admin standard
+  // Types d'admin que le compte connecté peut créer.
+  // « Admin standard » supprimé : la saisie administrative relève du Personnel.
+  // Root (0) → Fondateur, Directeur ; Fondateur (2) → Directeur
   const typesAdminCreables =
     user?.role === "admin" && Number(user?.typeRole) === 0
-      ? [{ v: 2, label: "Fondateur" }, { v: 3, label: "Directeur" }, { v: 1, label: "Admin standard" }]
+      ? [{ v: 2, label: "Fondateur" }, { v: 3, label: "Directeur" }]
       : user?.role === "admin" && Number(user?.typeRole) === 2
-      ? [{ v: 3, label: "Directeur" }, { v: 1, label: "Admin standard" }]
+      ? [{ v: 3, label: "Directeur" }]
       : [];
 
   const soumettreAdmin = async (ev) => {
@@ -454,7 +455,7 @@ function StaffPage() {
             <thead>
               <tr>
                 <th style={thStyle}>Enseignant</th>
-                <th style={thStyle}>Classe gérée</th>
+                <th style={thStyle}>Classe · Salle</th>
                 <th style={thStyle}>Matière de difficulté</th>
                 <th style={thStyle}>Statut</th>
                 <th style={{ ...thStyle, textAlign: "right" }}>Action</th>
@@ -478,7 +479,7 @@ function StaffPage() {
                         </span>
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.classe?.libelle || "—"}</td>
+                    <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.classe ? `${e.classe.libelle} · Salle ${(e.classe.salles || []).map((s) => s.libelle).join(" / ") || "—"}` : "—"}</td>
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.cours?.libelle || "Aucune"}</td>
                     <td style={tdStyle}><StatutBadge actif={e.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
@@ -564,10 +565,12 @@ function StaffPage() {
                 <div>
                   <label style={labelStyle}>Rôle *</label>
                   <select style={inputStyle} value={form.typePersonne} onChange={(e) => majForm("typePersonne", e.target.value)}>
-                    <option value="1">Enseignant</option>
-                    <option value="3">Scolarité</option>
-                    <option value="2">Administratif</option>
+                    <option value="1">Enseignant (instituteur)</option>
+                    <option value="3">Scolarité — inscriptions & dossiers</option>
+                    <option value="2">Administratif — secrétariat / caisse</option>
+                    <option value="5">Autres (surveillant, bibliothécaire…)</option>
                   </select>
+                  <p style={{ fontSize: 11, color: "#8a7060", marginTop: 5 }}>Scolarité et Administratif partagent l'espace « Scolarité » (élèves, paiements, messagerie).</p>
                 </div>
                 {Number(form.typePersonne) === 1 && (
                   <>
@@ -581,7 +584,7 @@ function StaffPage() {
                     </div>
                     {form.idClasse && (
                       <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Salle de la classe</label>
+                        <label style={labelStyle}>Salle de la classe <span style={{ fontWeight: 400, color: "var(--muted)" }}>(indicatif — l'affectation se fait à la classe)</span></label>
                         <select style={inputStyle} value={form.idSalle} onChange={(e) => majForm("idSalle", e.target.value)}>
                           <option value="">— Choisir une salle —</option>
                           {salles.filter((s) => String(s.classe?.idClasse) === String(form.idClasse)).map((s) => (
@@ -593,13 +596,20 @@ function StaffPage() {
                         )}
                       </div>
                     )}
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <label style={labelStyle}>Matière de difficulté (assurée par un autre)</label>
-                      <select style={inputStyle} value={form.idCours} onChange={(e) => majForm("idCours", e.target.value)}>
-                        <option value="">— Aucune (il donne toutes les matières) —</option>
-                        {cours.map((c) => <option key={c.idCours} value={c.idCours}>{c.libelle}</option>)}
-                      </select>
-                    </div>
+                    {form.idClasse && (
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        <label style={labelStyle}>Matière de difficulté (optionnel — assurée par un intérimaire)</label>
+                        <select style={inputStyle} value={form.idCours} onChange={(e) => majForm("idCours", e.target.value)}>
+                          <option value="">— Aucune (il donne toutes les matières) —</option>
+                          {cours.filter((c) => String(c.classe?.idClasse) === String(form.idClasse)).map((c) => (
+                            <option key={c.idCours} value={c.idCours}>{c.libelle}</option>
+                          ))}
+                        </select>
+                        {cours.filter((c) => String(c.classe?.idClasse) === String(form.idClasse)).length === 0 && (
+                          <p style={{ fontSize: 11, color: "#8a7060", marginTop: 5 }}>Aucune matière définie pour cette classe (Académique → Cours). La matière de difficulté pourra être définie plus tard.</p>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

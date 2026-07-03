@@ -75,6 +75,13 @@ export class ProfesseursController {
   @ApiOperation({ summary: 'Affecter une personne comme enseignant' })
   createEnseignant(@Body() dto: CreateEnseignantDto) { return this.professeursService.createEnseignant(dto); }
 
+  @Patch('enseignants/:id/difficulte')
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: 'Définir/effacer la matière de difficulté d\'un enseignant (idCours, ou null)' })
+  setMatiereDifficulte(@Param('id', ParseIntPipe) id: number, @Body() body: { idCours: number | null }) {
+    return this.professeursService.setMatiereDifficulte(id, body?.idCours ?? null);
+  }
+
   @Get('enseignants')
   @ApiOperation({ summary: 'Lister tous les enseignants' })
   findAllEnseignants() { return this.professeursService.findAllEnseignants(); }
@@ -109,6 +116,13 @@ export class ProfesseursController {
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Affecter une personne comme titulaire de classe' })
   createTitulaire(@Body() dto: CreateTitulaireDto) { return this.professeursService.createTitulaire(dto); }
+
+  @Patch('titulaires/:id/salle')
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: 'Modifier la salle d\'un titulaire (réaffectation)' })
+  updateTitulaire(@Param('id', ParseIntPipe) id: number, @Body() body: { idSalle: number }) {
+    return this.professeursService.updateTitulaire(id, Number(body?.idSalle));
+  }
 
   @Get('titulaires')
   @ApiOperation({ summary: 'Lister tous les titulaires' })
