@@ -40,6 +40,34 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
+/** Téléverse un fichier (multipart) : POST /upload → { url, filename, ... } */
+export async function uploadFichier(file) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const fd = new FormData();
+  fd.append("file", file);
+  let res;
+  try {
+    res = await fetch(`${API_URL}/upload`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd, // NE PAS fixer Content-Type : le navigateur ajoute le boundary
+    });
+  } catch {
+    throw new Error("Impossible de joindre le serveur pour l'upload.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`);
+  return data;
+}
+
+/** Transforme un chemin /uploads/... en URL absolue servie par le backend. */
+export function fichierURL(path) {
+  if (!path || path === "INDEFINI") return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = API_URL.replace(/\/api\/?$/, "");
+  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
 /** Profil du compte connecté : GET /auth/profil (token requis) */
 export const getProfil = () => apiFetch("/auth/profil");
 
@@ -55,6 +83,10 @@ export const changePassword = (data) =>
 
 /** Renouvelle le token (session glissante) : POST /auth/refresh */
 export const refreshToken = () => apiFetch("/auth/refresh", { method: "POST" });
+
+/** Mot de passe oublié : POST /auth/forgot-password (réponse générique) */
+export const forgotPassword = (username) =>
+  apiFetch("/auth/forgot-password", { method: "POST", body: JSON.stringify({ username }) });
 
 /** Authentification : POST /auth/login */
 export function login(username, password) {
@@ -138,6 +170,10 @@ export const getCours = () => apiFetch("/cours");
 export const getLivres = () => apiFetch("/cours/livres");
 export const createLivre = (data) =>
   apiFetch("/cours/livres", { method: "POST", body: JSON.stringify(data) });
+export const updateLivre = (id, data) =>
+  apiFetch(`/cours/livres/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteLivre = (id) =>
+  apiFetch(`/cours/livres/${id}`, { method: "DELETE" });
 export const getSpecialites = () => apiFetch("/cours/specialites");
 export const createSpecialite = (data) =>
   apiFetch("/cours/specialites", { method: "POST", body: JSON.stringify(data) });
@@ -197,8 +233,43 @@ export const supprimerMessage = (id) =>
 
 export const getRapportsEleve = (matricule) =>
   apiFetch(`/evaluations/rapports/eleve/${matricule}`);
+// Assiduité dérivée des rapports (absences/retards), optionnellement par année
+export const getStatsAbsences = (idAca) =>
+  apiFetch(`/evaluations/rapports/stats-absences${idAca ? `?idAca=${idAca}` : ""}`);
 export const createRapport = (data) =>
   apiFetch("/evaluations/rapports", { method: "POST", body: JSON.stringify(data) });
+
+// ─── Administration (lot B) ────────────────────────────────────────────────
+// Justificatifs d'absence
+export const getJustificatifs = () => apiFetch("/justificatifs");
+export const getJustificatifsByRapport = (idRapport) =>
+  apiFetch(`/justificatifs/rapport/${idRapport}`);
+export const createJustificatif = (data) =>
+  apiFetch("/justificatifs", { method: "POST", body: JSON.stringify(data) });
+export const validerJustificatif = (id) =>
+  apiFetch(`/justificatifs/${id}/valider`, { method: "PATCH" });
+export const deleteJustificatif = (id) =>
+  apiFetch(`/justificatifs/${id}`, { method: "DELETE" });
+
+// Fiches enseignant (suivi RH)
+export const getFichesEnseignant = (idEnseignant) =>
+  apiFetch(`/fiches-enseignant/enseignant/${idEnseignant}`);
+export const createFicheEnseignant = (data) =>
+  apiFetch("/fiches-enseignant", { method: "POST", body: JSON.stringify(data) });
+export const deleteFicheEnseignant = (idRap) =>
+  apiFetch(`/fiches-enseignant/${idRap}`, { method: "DELETE" });
+
+// Résidence (quartiers / résidents)
+export const getQuartiers = () => apiFetch("/residence/quartiers");
+export const createQuartier = (data) =>
+  apiFetch("/residence/quartiers", { method: "POST", body: JSON.stringify(data) });
+export const deleteQuartier = (id) =>
+  apiFetch(`/residence/quartiers/${id}`, { method: "DELETE" });
+export const getResidents = () => apiFetch("/residence/residents");
+export const createResident = (data) =>
+  apiFetch("/residence/residents", { method: "POST", body: JSON.stringify(data) });
+export const deleteResident = (id) =>
+  apiFetch(`/residence/residents/${id}`, { method: "DELETE" });
 export const getNotesEleve = (matricule) =>
   apiFetch(`/evaluations/notes/eleve/${matricule}`);
 
@@ -219,3 +290,4 @@ export const createEpreuve = (data) =>
   apiFetch("/evaluations/epreuves", { method: "POST", body: JSON.stringify(data) });
 export const saisirNote = (data) =>
   apiFetch("/evaluations/notes", { method: "POST", body: JSON.stringify(data) });
+

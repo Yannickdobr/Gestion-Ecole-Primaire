@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
-import { getSessions, getClassementSession, getNotesEleve } from "@/lib/api";
-import { Award, ChevronDown, Trophy } from "lucide-react";
+import { getSessions, getClassementSession, getNotesEleve, getClasses, getFrequenteBySalle } from "@/lib/api";
+import { imprimerBulletin } from "@/lib/print";
+import { Award, ChevronDown, Trophy, Printer } from "lucide-react";
 
 const thStyle = { padding: "12px 18px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
 const tdStyle = { padding: "12px 18px", fontSize: 14, color: "var(--text-dark)", borderBottom: "1px solid var(--surface-border)" };
@@ -17,6 +18,9 @@ export default function BulletinsPage() {
   const [sessions, setSessions] = useState([]);
   const [idSession, setIdSession] = useState("");
   const [data, setData] = useState(null); // { effectif, classement }
+  const [classes, setClasses] = useState([]);
+  const [idClasse, setIdClasse] = useState("");
+  const [filteredData, setFilteredData] = useState(null); // { effectif, classement }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(null);     // matricule déplié
@@ -24,16 +28,57 @@ export default function BulletinsPage() {
 
   useEffect(() => {
     getSessions().then((s) => setSessions(Array.isArray(s) ? s : [])).catch(() => setSessions([]));
+    getClasses().then((c) => setClasses(Array.isArray(c) ? c : [])).catch(() => setClasses([]));
   }, []);
 
   useEffect(() => {
-    if (!idSession) { setData(null); return; }
+    if (!idSession) { setData(null); setFilteredData(null); return; }
     setLoading(true); setError(""); setOpen(null);
     getClassementSession(idSession)
-      .then((d) => setData(d))
-      .catch((e) => { setError(e.message || "Erreur de chargement."); setData(null); })
+      .then((d) => { setData(d); setFilteredData(d); })
+      .catch((e) => { setError(e.message || "Erreur de chargement."); setData(null); setFilteredData(null); })
       .finally(() => setLoading(false));
   }, [idSession]);
+
+  useEffect(() => {
+    const filtrerParClasse = async () => {
+      if (!data) return;
+      if (!idClasse) { setFilteredData(data); return; }
+      
+      setLoading(true);
+      try {
+        const classeObj = classes.find((c) => String(c.idClasse) === String(idClasse));
+        if (!classeObj || !classeObj.salles || classeObj.salles.length === 0) {
+          setFilteredData({ effectif: 0, classement: [] });
+          setLoading(false);
+          return;
+        }
+
+        let allMatricules = new Set();
+        for (const s of classeObj.salles) {
+          const freq = await getFrequenteBySalle(s.idSalle).catch(() => []);
+          freq.forEach(f => { if (f.eleve?.matricule) allMatricules.add(Number(f.eleve.matricule)); });
+        }
+
+        const newClassement = data.classement.filter(l => allMatricules.has(Number(l.matricule)));
+        
+        // Re-calculate ranks for this specific class
+        let rang = 0;
+        let prev = null;
+        newClassement.forEach((l, i) => {
+          if (prev === null || l.moyenne < prev) { rang = i + 1; prev = l.moyenne; }
+          l.rang = rang;
+        });
+
+        setFilteredData({ effectif: newClassement.length, classement: newClassement });
+      } catch (e) {
+        setError("Erreur de filtrage par classe.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    filtrerParClasse();
+  }, [idClasse, data, classes]);
 
   const voirBulletin = async (matricule) => {
     if (open === matricule) { setOpen(null); return; }
@@ -55,12 +100,21 @@ export default function BulletinsPage() {
       </div>
       <p style={{ color: "var(--muted)", marginBottom: 24 }}>Moyennes pondérées par coefficient et rang par session.</p>
 
-      <div style={{ maxWidth: 360, marginBottom: 20 }}>
-        <label style={labelStyle}>Session</label>
-        <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
-          <option value="">— Choisir une session —</option>
-          {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
-        </select>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ minWidth: 260 }}>
+          <label style={labelStyle}>Session</label>
+          <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
+            <option value="">— Choisir une session —</option>
+            {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+          </select>
+        </div>
+        <div style={{ minWidth: 260 }}>
+          <label style={labelStyle}>Classe (Filtre Optionnel)</label>
+          <select style={inputStyle} value={idClasse} onChange={(e) => setIdClasse(e.target.value)}>
+            <option value="">— Toutes les classes —</option>
+            {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
+          </select>
+        </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
@@ -70,7 +124,7 @@ export default function BulletinsPage() {
           <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Sélectionnez une session pour afficher le classement.</div>
         ) : loading ? (
           <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Chargement…</div>
-        ) : !data || data.classement.length === 0 ? (
+        ) : !filteredData || filteredData.classement.length === 0 ? (
           <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Aucune note saisie pour cette session.</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -79,23 +133,33 @@ export default function BulletinsPage() {
               <th style={thStyle}>Moyenne</th><th style={thStyle}>Notes</th><th style={{ ...thStyle, textAlign: "right" }}>Bulletin</th>
             </tr></thead>
             <tbody>
-              {data.classement.map((l) => (
+              {filteredData.classement.map((l) => (
                 <FragmentRow key={l.matricule} l={l} idSession={Number(idSession)}
+                  sessionLibelle={sessions.find((s) => String(s.idSession) === String(idSession))?.libelle || ""}
+                  effectif={filteredData.effectif}
                   open={open === l.matricule} notes={notes[l.matricule]} onToggle={() => voirBulletin(l.matricule)} />
               ))}
             </tbody>
           </table>
         )}
       </div>
-      {data && data.effectif > 0 && (
-        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>{data.effectif} élève(s) classé(s) · ex-aequo = même rang.</p>
+      {filteredData && filteredData.effectif > 0 && (
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>{filteredData.effectif} élève(s) classé(s) · ex-aequo = même rang.</p>
       )}
     </div>
   );
 }
 
-function FragmentRow({ l, idSession, open, notes, onToggle }) {
+function FragmentRow({ l, idSession, sessionLibelle, effectif, open, notes, onToggle }) {
   const notesSession = (notes || []).filter((n) => Number(n.session?.idSession) === idSession);
+
+  const imprimer = async () => {
+    let n = notes;
+    if (!n) n = await getNotesEleve(l.matricule).catch(() => []);
+    const ns = (n || []).filter((x) => Number(x.session?.idSession) === idSession);
+    imprimerBulletin({ eleve: { matricule: l.matricule, prenom: l.prenom, nom: l.nom }, session: sessionLibelle, notes: ns, moyenne: l.moyenne, rang: l.rang, effectif });
+  };
+
   return (
     <>
       <tr>
@@ -104,9 +168,14 @@ function FragmentRow({ l, idSession, open, notes, onToggle }) {
         <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(l.moyenne)}/20</td>
         <td style={{ ...tdStyle, color: "var(--muted)" }}>{l.nbNotes}</td>
         <td style={{ ...tdStyle, textAlign: "right" }}>
-          <button onClick={onToggle} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Détail <ChevronDown size={14} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
-          </button>
+          <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={imprimer} title="Imprimer le bulletin" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              <Printer size={13} /> Bulletin
+            </button>
+            <button onClick={onToggle} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Détail <ChevronDown size={14} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+            </button>
+          </div>
         </td>
       </tr>
       {open && (

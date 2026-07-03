@@ -3,12 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
+import { imprimerRecu } from "@/lib/print";
 import {
   getEleves, getPaiementsEleve, getModes, createModePaiement,
   getScolarites, createScolarite, createTranche, enregistrerPaiement, getArrieresAuto,
   getCycles, getAnnees, getPersonnesTous,
 } from "@/lib/api";
-import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock } from "lucide-react";
+import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock, Printer, FileText } from "lucide-react";
+import BilanClasse from "./BilanClasse";
 
 const thStyle = { padding: "12px 20px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
 const tdStyle = { padding: "12px 20px", fontSize: 14, color: "var(--text-dark)", borderBottom: "1px solid var(--surface-border)" };
@@ -20,6 +23,7 @@ function formatDate(d) { if (!d) return "—"; try { return new Date(d).toLocale
 
 export default function PaymentsPage() {
   const { user } = useAuth();
+  const { anneeId } = useActiveYear();
   const [tab, setTab] = useState("versements");
   const [error, setError] = useState("");
 
@@ -59,6 +63,9 @@ export default function PaymentsPage() {
   }, []);
 
   useEffect(() => { chargerRef(); }, [chargerRef]);
+
+  // Année active (TopNav) → pré-sélection par défaut du filtre année
+  useEffect(() => { if (anneeId && !idAca) setIdAca(String(anneeId)); }, [anneeId, idAca]);
 
   // Charger paiements + arriérés de l'élève sélectionné.
   // Le cycle (donc les frais) est déduit automatiquement de la classe de l'élève côté backend.
@@ -158,6 +165,7 @@ export default function PaymentsPage() {
   const estFondateur = user?.role === "admin" && [0, 2].includes(Number(user?.typeRole));
   const tabs = [
     { key: "versements", label: "Versements", icon: <Receipt size={16} /> },
+    { key: "bilan", label: "Bilan par Classe", icon: <FileText size={16} /> },
     ...(estFondateur ? [{ key: "scolarite", label: "Scolarité & tranches", icon: <GraduationCap size={16} /> }] : []),
     { key: "modes", label: "Modes", icon: <Wallet size={16} /> },
   ];
@@ -178,6 +186,9 @@ export default function PaymentsPage() {
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
+
+      {/* ── BILAN PAR CLASSE ── */}
+      {tab === "bilan" && <BilanClasse anneeId={idAca} />}
 
       {/* ── VERSEMENTS ── */}
       {tab === "versements" && (
@@ -267,15 +278,24 @@ export default function PaymentsPage() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 20, overflow: "hidden" }}>
             {!matricule ? <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Sélectionnez un élève pour voir ses versements.</div> : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Montant</th><th style={thStyle}>Mode</th><th style={thStyle}>Commentaire</th></tr></thead>
+                <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Montant</th><th style={thStyle}>Mode</th><th style={thStyle}>Commentaire</th><th style={{ ...thStyle, textAlign: "right" }}>Reçu</th></tr></thead>
                 <tbody>
-                  {paiements.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={4}>Aucun versement.</td></tr> :
+                  {paiements.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={5}>Aucun versement.</td></tr> :
                     paiements.map((p) => (
                       <tr key={p.idPaie}>
                         <td style={tdStyle}>{formatDate(p.datePaie)}</td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(p.montant)}</td>
                         <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.mode?.libelle || "—"}</td>
                         <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.commentaire && p.commentaire !== "INDEFINI" ? p.commentaire : "—"}</td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          <button onClick={() => {
+                            const el = eleves.find((e) => String(e.matricule) === String(matricule));
+                            const an = annees.find((a) => String(a.idAnnee) === String(idAca));
+                            imprimerRecu({ eleve: el || { matricule }, paiement: p, classe: arrieres?.classe?.libelle, annee: an?.libelle });
+                          }} title="Imprimer le reçu" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 9, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            <Printer size={13} /> Reçu
+                          </button>
+                        </td>
                       </tr>
                     ))}
                 </tbody>
