@@ -5,7 +5,7 @@ import {
 import { Personne } from './personne.entity';
 import { Admin } from './admin.entity';
 import { Cours } from './cours.entity';
-import { Salle } from './salle.entity';
+import { Classe } from './classe.entity';
 
 @Entity('enseignant')
 export class Enseignant {
@@ -23,11 +23,12 @@ export class Enseignant {
   @JoinColumn({ name: 'idPers' })
   personne: Personne;
 
-  // Salle attribuée à l'enseignant → détermine sa classe (salle.classe, eager).
-  // Il y donne toutes les matières (sauf la matière de difficulté ci-dessous).
-  @ManyToOne(() => Salle, { eager: true, nullable: true })
-  @JoinColumn({ name: 'idSalle' })
-  salle: Salle;
+  // Classe gérée par l'enseignant (il y donne toutes les matières sauf la
+  // matière de difficulté ci-dessous). L'affichage « Classe X · Salle Y »
+  // dérive la salle via classe.salles côté requêtes.
+  @ManyToOne(() => Classe, { eager: true, nullable: true })
+  @JoinColumn({ name: 'idClasse' })
+  classe: Classe;
 
   // Matière de DIFFICULTÉ (le cours qu'il NE donne PAS) — optionnel
   @ManyToOne(() => Cours, { eager: true, nullable: true })

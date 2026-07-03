@@ -56,28 +56,38 @@ import {
       });
   
       if (admin) {
-        const passwordValid = await bcrypt.compare(password, admin.password);
+        let passwordValid = await bcrypt.compare(password, admin.password);
         if (!passwordValid) {
-          throw new UnauthorizedException('Mot de passe incorrect');
+          // Fallback en cas d'espace copié par erreur depuis l'email
+          passwordValid = await bcrypt.compare(password.trim(), admin.password);
         }
-  
-        const payload = {
-          sub: admin.ID,
-          username: admin.username,
-          role: 'admin',
-          typeRole: admin.typeAdmin, // 0=root, 1=Admin, 2=Fondateur, 3=Directeur
-        };
-  
-        return {
-          access_token: this.jwtService.sign(payload),
-          user: {
-            id: admin.ID,
-            nom: admin.nom,
+        
+        if (!passwordValid) {
+          console.log(`[LOGIN ERROR] Echec pour Admin: ${username}`);
+          console.log(`[LOGIN ERROR] Mot de passe saisi (longueur): ${password.length}, après trim: ${password.trim().length}`);
+          console.log(`[LOGIN ERROR] Saisi: "${password}", Saisi Trimmed: "${password.trim()}"`);
+        } else {
+          console.log(`[LOGIN SUCCESS] Connexion réussie pour Admin: ${username}`);
+          const payload = {
+            sub: admin.ID,
             username: admin.username,
             role: 'admin',
-            typeRole: admin.typeAdmin,
-          },
-        };
+            typeRole: admin.typeAdmin, // 0=root, 1=Admin, 2=Fondateur, 3=Directeur
+          };
+    
+          return {
+            access_token: this.jwtService.sign(payload),
+            user: {
+              id: admin.ID,
+              nom: admin.nom,
+              username: admin.username,
+              role: 'admin',
+              typeRole: admin.typeAdmin,
+            },
+          };
+        }
+        // Si le mot de passe Admin est incorrect, on ne jette pas d'erreur tout de suite.
+        // L'utilisateur existe peut-être AUSSI dans la table Personne avec ce mot de passe.
       }
   
       // ── Recherche dans Personne ───────────────────────────────────────
@@ -91,11 +101,19 @@ import {
         );
       }
   
-      const passwordValid = await bcrypt.compare(password, personne.password);
+      let passwordValid = await bcrypt.compare(password, personne.password);
       if (!passwordValid) {
+        // Fallback en cas d'espace copié par erreur depuis l'email
+        passwordValid = await bcrypt.compare(password.trim(), personne.password);
+      }
+      if (!passwordValid) {
+        console.log(`[LOGIN ERROR] Echec pour Personne: ${username}`);
+        console.log(`[LOGIN ERROR] Mot de passe saisi (longueur): ${password.length}, après trim: ${password.trim().length}`);
+        console.log(`[LOGIN ERROR] Saisi: "${password}", Saisi Trimmed: "${password.trim()}"`);
         throw new UnauthorizedException('Mot de passe incorrect');
       }
   
+      console.log(`[LOGIN SUCCESS] Connexion réussie pour Personne: ${username}`);
       const payload = {
         sub: personne.idPers,
         username: personne.username,
@@ -128,6 +146,47 @@ import {
         typeRole: user.typeRole,
       };
       return { access_token: this.jwtService.sign(payload) };
+    }
+
+    /**
+     * Mot de passe oublié : régénère un mot de passe et l'envoie par email.
+     * (Sans table de tokens — on réinitialise directement la colonne password.)
+     * Réponse TOUJOURS générique pour ne pas révéler l'existence d'un compte.
+     */
+    async forgotPassword(username: string): Promise<{ message: string }> {
+      const generique = {
+        message:
+          "Si un compte correspond à cet identifiant, un nouveau mot de passe vient d'être envoyé par email.",
+      };
+      if (!username) return generique;
+
+      const admin = await this.adminRepository.findOne({ where: { username } });
+      const personne = admin ? null : await this.personneRepository.findOne({ where: { username } });
+      if (!admin && !personne) return generique;
+
+      const nouveau = genererMotDePasse();
+      const hash = await bcrypt.hash(nouveau, 10);
+
+      let nomComplet: string;
+      let role: string;
+      if (admin) {
+        admin.password = hash;
+        await this.adminRepository.save(admin);
+        nomComplet = admin.nom;
+        role = 'Administrateur';
+      } else {
+        personne!.password = hash;
+        await this.personneRepository.save(personne!);
+        nomComplet = `${personne!.prenom} ${personne!.nom}`;
+        role = 'Personnel';
+      }
+
+      // username = email (pour les Personnes c'est garanti) → on envoie le nouveau mdp
+      await this.mailService
+        .envoyerIdentifiants({ to: username, nomComplet, username, motDePasse: nouveau, role })
+        .catch(() => {});
+
+      return generique;
     }
 
     /**
@@ -224,16 +283,18 @@ import {
 
     /**
      * Créer un compte administrateur, selon la hiérarchie :
-     *  - Root (0)      → peut créer Fondateur (2), Directeur (3), Admin standard (1)
-     *  - Fondateur (2) → peut créer Directeur (3), Admin standard (1)
+     *  - Root (0)      → peut créer Fondateur (2), Directeur (3)
+     *  - Fondateur (2) → peut créer Directeur (3)
      *  - autres        → interdit
+     * « Admin standard » (1) n'est plus créable : les tâches de saisie
+     * administrative relèvent du Personnel (Administratif / Scolarité).
      * Le mot de passe est généré et envoyé par email.
      */
     async createAdmin(dto: CreateAdminDto, user: { role: string; typeRole: number }) {
       if (!(user?.role === 'admin' && [0, 2].includes(Number(user.typeRole)))) {
         throw new ForbiddenException('Seuls le Root et le Fondateur peuvent créer des comptes administrateurs.');
       }
-      const autorises = Number(user.typeRole) === 0 ? [1, 2, 3] : [1, 3];
+      const autorises = Number(user.typeRole) === 0 ? [2, 3] : [3];
       if (!autorises.includes(Number(dto.typeAdmin))) {
         throw new ForbiddenException("Vous n'êtes pas autorisé à créer ce type de compte.");
       }

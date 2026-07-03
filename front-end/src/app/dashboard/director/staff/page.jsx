@@ -436,7 +436,7 @@ function StaffPage() {
                     <td style={tdStyle}><span style={{ fontSize: 12, fontWeight: 600, padding: "2px 10px", borderRadius: 999, background: "rgba(37,99,235,0.1)", color: "#2563eb" }}>{TYPE_ADMIN[a.typeAdmin] ?? "Admin"}</span></td>
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{a.username}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
-                      {estRootOuFondateur && Number(a.ID) !== Number(user?.id) ? (
+                      {estRootOuFondateur && Number(a.ID) !== Number(user?.id) && !(Number(user?.typeRole) === 2 && Number(a.typeAdmin) === 0) ? (
                         <button onClick={() => supprimerAdmin(a)} disabled={busyId === `adm-${a.ID}`} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                           <Trash2 size={14} /> {busyId === `adm-${a.ID}` ? "…" : "Supprimer"}
                         </button>

@@ -112,7 +112,7 @@ export class ProfesseursService {
 
     // Mot de passe : fourni, sinon généré par le backend (envoyé ensuite par email)
     const motDePasseGenere = !dto.password;
-    const motDePasseClair = dto.password ?? genererMotDePasse();
+    const motDePasseClair = dto.password ? dto.password : genererMotDePasse();
     const hashedPassword = await bcrypt.hash(motDePasseClair, 10);
 
     // Valeurs par défaut pour les colonnes NOT NULL non renseignées
@@ -290,7 +290,7 @@ export class ProfesseursService {
    */
   async findAllEnseignants(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
-      relations: ['personne'],
+      relations: ['personne', 'classe.salles'], // classe.salles → affichage « Classe X · Salle Y »
       order: { created_at: 'DESC' },
     });
   }
@@ -301,7 +301,7 @@ export class ProfesseursService {
   async findEnseignantsActifs(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
       where: { actif: 1 }, // ✅ minuscule corrigé
-      relations: ['personne'],
+      relations: ['personne', 'classe.salles'],
       order: { created_at: 'DESC' },
     });
   }
@@ -312,7 +312,7 @@ export class ProfesseursService {
   async findEnseignantById(idEnseignant: number): Promise<Enseignant> {
     const enseignant = await this.enseignantRepository.findOne({
       where: { idEnseignant },
-      relations: ['personne'],
+      relations: ['personne', 'classe.salles'],
     });
     if (!enseignant) {
       throw new NotFoundException(`Enseignant introuvable (id: ${idEnseignant})`);

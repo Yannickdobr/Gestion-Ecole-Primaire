@@ -468,6 +468,20 @@ export class EvaluationsService {
     return this.rapportRepository.save(rapport);
   }
 
+  /**
+   * Statistiques d'assiduité dérivées des Rapports (approche sans table dédiée) :
+   * on compte les faits dont le libellé évoque une absence / un retard.
+   * Optionnellement filtré par année académique.
+   */
+  async statsAbsences(idAca?: number): Promise<{ absences: number; retards: number; total: number; faitsTotal: number }> {
+    const rapports = await this.rapportRepository.find({ relations: ['anneeAcademique'] });
+    const filtres = rapports.filter((r) => !idAca || Number(r.anneeAcademique?.idAnnee) === Number(idAca));
+    const norm = (s?: string) => (s || '').toLowerCase();
+    const absences = filtres.filter((r) => norm(r.libelle).includes('absence')).length;
+    const retards = filtres.filter((r) => norm(r.libelle).includes('retard')).length;
+    return { absences, retards, total: absences + retards, faitsTotal: filtres.length };
+  }
+
   async findRapportsByEleve(matricule: number): Promise<Rapport[]> {
     return this.rapportRepository.find({
       where: { eleve: { matricule } },
