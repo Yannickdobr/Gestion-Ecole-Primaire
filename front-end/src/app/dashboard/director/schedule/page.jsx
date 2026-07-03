@@ -13,6 +13,7 @@ import {
 import { BsPersonFill, BsCalendar3 } from 'react-icons/bs';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
+import { useActiveYear } from '@/context/ActiveYearContext';
 import {
   getClasses, getEnseignants, getSalles, getCours, getEmploi,
   createEmploi, deleteEmploi, verifierConflitsEmploi,
