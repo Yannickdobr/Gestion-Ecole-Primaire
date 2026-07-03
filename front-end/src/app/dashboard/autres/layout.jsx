@@ -2,10 +2,11 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import TopNav from "@/components/TopNav";
-import { Home, MessageSquare, KeyRound } from "lucide-react";
+import { Home, MessageSquare, KeyRound, LibraryBig } from "lucide-react";
 
 const ITEMS = [
   { tkey: "accueil", label: "Accueil", href: "/dashboard/autres", icon: <Home size={18} /> },
+  { tkey: "bibliotheque", label: "Bibliothèque", href: "/dashboard/autres/bibliotheque", icon: <LibraryBig size={18} /> },
   { tkey: "messages", label: "Messagerie", href: "/dashboard/autres/messages", icon: <MessageSquare size={18} /> },
 ];
 
