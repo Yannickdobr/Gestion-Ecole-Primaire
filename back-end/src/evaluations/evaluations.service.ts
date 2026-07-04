@@ -16,6 +16,7 @@ import { Eleve } from '../entities/eleve.entity';
 import { Cours } from '../entities/cours.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
+import { NotificationService } from '../common/notification.service';
 import {
   CreateTrimestreDto, UpdateTrimestreDto,
   CreateSessionDto, UpdateSessionDto,
@@ -60,6 +61,8 @@ export class EvaluationsService {
 
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
+
+    private readonly notifications: NotificationService,
   ) {}
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -465,7 +468,21 @@ export class EvaluationsService {
       throw new NotFoundException('Aucune personne en base pour signer le rapport.');
     }
     rapport.redacteur = redacteur;
-    return this.rapportRepository.save(rapport);
+    const saved = await this.rapportRepository.save(rapport);
+
+    // BF-23 : notifier automatiquement les parents (in-app + email), best-effort.
+    this.notifications
+      .notifierParentsEleve(
+        dto.matricule,
+        `Nouveau relevé : ${dto.libelle}`,
+        `Bonjour,\nUn nouvel élément a été enregistré pour votre enfant (matricule ${dto.matricule}) : « ${dto.libelle} ».` +
+          (dto.commentaire ? `\nObservation : ${dto.commentaire}` : '') +
+          `\nConnectez-vous à BrightSchool pour le consulter.`,
+        { expediteurId: dto.idPers, annee: annee.libelle },
+      )
+      .catch(() => undefined);
+
+    return saved;
   }
 
   /**

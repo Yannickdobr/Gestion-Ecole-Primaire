@@ -15,6 +15,7 @@ import { AnneeAcademique } from '../entities/annee-academique.entity';
 import { Cycle } from '../entities/cycle.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
+import { NotificationService } from '../common/notification.service';
 import {
   CreateModeDto, UpdateModeDto,
   CreateScolariteDto, UpdateScolariteDto,
@@ -51,7 +52,48 @@ export class PaiementsService {
 
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
+
+    private readonly notifications: NotificationService,
   ) {}
+
+  /**
+   * BF-23 — Rappels d'impayés (déclenché manuellement par la scolarité/direction).
+   * Parcourt les élèves actifs, calcule leur arriéré pour l'année et notifie
+   * (in-app + email) les parents de ceux ayant un solde dû.
+   */
+  async envoyerRappelsImpayes(idAca: number, expediteurId?: number) {
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca } });
+    if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${idAca})`);
+
+    const eleves = await this.eleveRepository.find({ where: { actif: 1 } });
+    let elevesEnRetard = 0;
+    const details: any[] = [];
+
+    for (const el of eleves) {
+      let arr: any;
+      try {
+        arr = await this.calculerArrieres(el.matricule, idAca);
+      } catch {
+        continue; // élève sans données exploitables cette année
+      }
+      if (!arr?.scolariteDefinie || Number(arr.arriere) <= 0) continue;
+
+      const montant = Number(arr.arriere);
+      const res = await this.notifications.notifierParentsEleve(
+        el.matricule,
+        'Rappel : scolarité en attente',
+        `Bonjour,\nNous vous rappelons qu'un solde de scolarité de ${montant} FCFA reste dû pour votre enfant ` +
+          `(matricule ${el.matricule}) au titre de l'année ${annee.libelle}.\n` +
+          `Merci de bien vouloir régulariser la situation auprès de la scolarité.`,
+        { expediteurId, annee: annee.libelle, type: 2 },
+      );
+      if (res.inApp > 0 || res.emails > 0) {
+        elevesEnRetard++;
+        details.push({ matricule: el.matricule, arriere: montant, ...res });
+      }
+    }
+    return { annee: annee.libelle, elevesEnRetard, details };
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // MODES DE PAIEMENT

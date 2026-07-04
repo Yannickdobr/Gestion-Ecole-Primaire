@@ -101,4 +101,40 @@ export class MailService implements OnModuleInit {
       return false;
     }
   }
+
+  /**
+   * Envoi générique (notifications : bulletins, rappels, annonces).
+   * `texte` est habillé dans un gabarit HTML BrightSchool si `html` n'est pas fourni.
+   * Retourne false sans lever d'exception en cas d'échec (best-effort).
+   */
+  async envoyer(params: {
+    to: string;
+    sujet: string;
+    texte: string;
+    html?: string;
+  }): Promise<boolean> {
+    const { to, sujet, texte } = params;
+    // On n'envoie que vers une adresse email valide (le username fait office d'email).
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return false;
+
+    const from =
+      this.config.get<string>('MAIL_FROM') || this.config.get<string>('MAIL_USER');
+    const html =
+      params.html ??
+      `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#1a1208">
+        <h2 style="color:#d86310">BrightSchool</h2>
+        <div style="background:#faf6f1;border:1px solid #eee;border-radius:10px;padding:16px;margin:12px 0;white-space:pre-line">${texte}</div>
+        <p style="color:#8a7060;font-size:13px;margin-top:20px">BrightSchool — message automatique, merci de ne pas répondre.</p>
+      </div>`;
+
+    try {
+      const info = await this.transporter.sendMail({ from, to, subject: sujet, html, text: texte });
+      const accepte = (info.accepted || []).map(String);
+      return accepte.includes(to);
+    } catch (e) {
+      this.logger.error(`Échec notification email à ${to} : ${(e as Error).message}`);
+      return false;
+    }
+  }
 }

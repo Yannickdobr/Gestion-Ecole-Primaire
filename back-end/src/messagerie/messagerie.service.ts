@@ -7,6 +7,7 @@ import { Messages } from '../entities/messages.entity';
 import { Personne } from '../entities/personne.entity';
 import { Parents } from '../entities/parents.entity';
 import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/messagerie.dto';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class MessagerieService {
@@ -17,6 +18,7 @@ export class MessagerieService {
     private personneRepository: Repository<Personne>,
     @InjectRepository(Parents)
     private parentsRepository: Repository<Parents>,
+    private readonly mail: MailService,
   ) {}
 
   private getTypeLibelle(type: number): string {
@@ -76,6 +78,14 @@ export class MessagerieService {
       });
       await this.messagesRepository.save(message);
       envoyes++;
+
+      // BF-23 : doubler l'annonce d'un email (best-effort ; le username fait office d'email).
+      const email = destinataire.personne?.username;
+      if (email) {
+        this.mail
+          .envoyer({ to: email, sujet: dto.objet, texte: dto.information })
+          .catch(() => undefined);
+      }
     }
     return { envoyes, erreurs };
   }

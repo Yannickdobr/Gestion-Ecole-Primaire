@@ -107,6 +107,14 @@ export class PaiementsController {
   @ApiOperation({ summary: 'Enregistrer un versement d\'un élève' })
   enregistrerPaiement(@Body() dto: CreatePaiementDto) { return this.paiementsService.enregistrerPaiement(dto); }
 
+  @Post('rappels-impayes/:idAca')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'BF-23 : envoyer les rappels d\'impayés aux parents (année académique)' })
+  envoyerRappelsImpayes(@Request() req, @Param('idAca', ParseIntPipe) idAca: number) {
+    const expediteurId = req.user?.role === 'personne' ? req.user.id : undefined;
+    return this.paiementsService.envoyerRappelsImpayes(idAca, expediteurId);
+  }
+
   @Get('eleve/:matricule')
   @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT) // un parent voit les paiements de SES enfants
   @ApiOperation({ summary: 'Historique des paiements d\'un élève' })
