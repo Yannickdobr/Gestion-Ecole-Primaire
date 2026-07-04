@@ -55,7 +55,7 @@ export function imprimerRecu({ eleve, paiement, classe, annee }) {
 }
 
 /** Bulletin de notes (une session). */
-export function imprimerBulletin({ eleve, session, notes, moyenne, rang, effectif }) {
+export function imprimerBulletin({ eleve, session, notes, moyenne, rang = null, effectif = null }) {
   const lignes = (notes || []).map((n) =>
     `<tr><td>${esc(n.cours?.libelle || "Cours")}</td><td>${esc(n.cours?.coefficient ?? 1)}</td><td><b>${esc(n.note)}/20</b></td><td>${esc(n.appreciation && n.appreciation !== "RAS" ? n.appreciation : "")}</td></tr>`
   ).join("");
