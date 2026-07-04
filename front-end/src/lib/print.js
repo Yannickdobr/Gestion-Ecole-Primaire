@@ -106,3 +106,19 @@ export function imprimerCarte({ eleve, classe, annee }) {
     </div>`;
   ouvrirImpression(`Carte_${eleve?.matricule || ""}`, corps);
 }
+
+/** Certificat de scolarité pré-rempli. */
+export function imprimerAttestation({ eleve, classe, annee }) {
+  const corps = `
+    <h1>Certificat de scolarité</h1>
+    <div class="meta">Année scolaire ${esc(annee || "—")}</div>
+    <p style="margin:24px 0;line-height:1.9;font-size:14px">
+      Le Directeur de l'établissement <b>BrightSchool</b> certifie que l'élève
+      <b>${esc(eleve?.prenom)} ${esc(eleve?.nom)}</b>, matricule <b>#${esc(eleve?.matricule)}</b>,
+      né(e) le <b>${fmtDate(eleve?.dateNaissance)}</b>, est régulièrement inscrit(e) et fréquente la classe de
+      <b>${esc(classe || "—")}</b> au titre de l'année scolaire <b>${esc(annee || "—")}</b>.
+    </p>
+    <p style="font-size:14px">En foi de quoi, le présent certificat lui est délivré pour servir et valoir ce que de droit.</p>
+    <div style="margin-top:48px;text-align:right;font-size:13px;color:#4a3728">Le Directeur<br/><br/>__________________</div>`;
+  ouvrirImpression(`Certificat_${eleve?.matricule || ""}`, corps);
+}

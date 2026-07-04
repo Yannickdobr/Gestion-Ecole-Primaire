@@ -2,11 +2,12 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import TopNav from "@/components/TopNav";
-import { Home, MessageSquare, KeyRound, LibraryBig, ShieldAlert } from "lucide-react";
+import { Home, MessageSquare, KeyRound, LibraryBig, ShieldAlert, Megaphone } from "lucide-react";
 
 const ITEMS = [
   { tkey: "accueil", label: "Accueil", href: "/dashboard/autres", icon: <Home size={18} /> },
   { tkey: "discipline", label: "Discipline", href: "/dashboard/autres/discipline", icon: <ShieldAlert size={18} /> },
+  { tkey: "convocations", label: "Convocations", href: "/dashboard/autres/convocations", icon: <Megaphone size={18} /> },
   { tkey: "bibliotheque", label: "Bibliothèque", href: "/dashboard/autres/bibliotheque", icon: <LibraryBig size={18} /> },
   { tkey: "messages", label: "Messagerie", href: "/dashboard/autres/messages", icon: <MessageSquare size={18} /> },
 ];

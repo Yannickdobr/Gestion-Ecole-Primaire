@@ -2,12 +2,13 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import TopNav from "@/components/TopNav";
-import { Home, GraduationCap, CreditCard, MessageSquare, KeyRound } from "lucide-react";
+import { Home, GraduationCap, CreditCard, MessageSquare, KeyRound, FileText } from "lucide-react";
 
 const ITEMS = [
   { tkey: "accueil", label: "Accueil", href: "/dashboard/scolarite", icon: <Home size={18} /> },
   { tkey: "students", label: "Élèves", href: "/dashboard/scolarite/students", icon: <GraduationCap size={18} /> },
   { tkey: "payments", label: "Paiements", href: "/dashboard/scolarite/payments", icon: <CreditCard size={18} /> },
+  { tkey: "documents", label: "Documents", href: "/dashboard/scolarite/documents", icon: <FileText size={18} /> },
   { tkey: "messages", label: "Messagerie", href: "/dashboard/scolarite/messages", icon: <MessageSquare size={18} /> },
 ];
 
