@@ -23,7 +23,9 @@ import { Personne } from '../entities/personne.entity';
         useFactory: (config: ConfigService) => ({
           secret: config.get<string>('JWT_SECRET'),
           signOptions: {
-            expiresIn: config.get('JWT_EXPIRES_IN', '8h') as any,
+            // BNF-02 : session de 30 min ; prolongée par /auth/refresh tant que
+            // l'utilisateur reste actif (session glissante gérée côté front).
+            expiresIn: config.get('JWT_EXPIRES_IN', '30m') as any,
           },
         }),
         inject: [ConfigService],
