@@ -22,18 +22,18 @@ export class ElevesController {
   ) {}
 
   @Get()
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT)
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister tous les élèves' })
   @ApiResponse({ status: 200, description: 'Liste complète des élèves' })
   findAll() { return this.elevesService.findAll(); }
 
   @Get('actifs')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT)
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister les élèves actifs uniquement' })
   findActifs() { return this.elevesService.findActifs(); }
 
   @Get('search')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT)
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Rechercher un élève par nom ou prénom' })
   @ApiQuery({ name: 'q', required: true, description: 'Nom ou prénom à rechercher' })
   search(@Query('q') query: string) { return this.elevesService.search(query ?? ''); }
@@ -49,7 +49,7 @@ export class ElevesController {
   }
 
   @Get(':matricule')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT)
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
   @ApiOperation({ summary: 'Détail d\'un élève' })
   @ApiParam({ name: 'matricule', description: 'Matricule de l\'élève' })
   @ApiResponse({ status: 404, description: 'Élève introuvable' })
@@ -84,7 +84,7 @@ export class ElevesController {
   remove(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.remove(matricule); }
 
   @Get(':matricule/parents')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT)
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister les parents d\'un élève' })
   async getParents(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
     await this.acl.assertEleveAccess(req.user, matricule);
