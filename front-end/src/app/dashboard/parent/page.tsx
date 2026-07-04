@@ -17,7 +17,7 @@ import {
   uploadFichier,
   fichierURL
 } from "@/lib/api";
-import { imprimerRecu } from "@/lib/print";
+import { imprimerRecu, imprimerBulletin } from "@/lib/print";
 import ChangePassword from "@/components/ChangePassword";
 import { 
   LogOut, GraduationCap, BookOpen, Wallet, Mail, Printer, 
@@ -434,9 +434,25 @@ export default function ParentDashboard() {
                     {/* TAB: NOTES */}
                     {activeTab === "notes" && (
                       <div style={{ background: "var(--surface, #fff)", border: "1px solid var(--surface-border, #eee)", borderRadius: 20, overflow: "hidden" }}>
-                        <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--surface-border, #eee)", display: "flex", alignItems: "center", gap: 8 }}>
-                          <BookOpen size={18} style={{ color: "var(--orange)" }} />
-                          <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-dark)" }}>Notes de {selection.prenom}</h3>
+                        <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--surface-border, #eee)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <BookOpen size={18} style={{ color: "var(--orange)" }} />
+                            <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-dark)" }}>Notes de {selection.prenom}</h3>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const coefs = notes.reduce((s, n) => s + (Number(n.cours?.coefficient) || 1), 0);
+                              const moyenne = coefs
+                                ? notes.reduce((s, n) => s + (Number(n.note) || 0) * (Number(n.cours?.coefficient) || 1), 0) / coefs
+                                : null;
+                              imprimerBulletin({ eleve: selection, session: "Relevé de notes", notes, moyenne });
+                            }}
+                            disabled={notes.length === 0}
+                            title={notes.length === 0 ? "Aucune note à imprimer" : "Télécharger le bulletin"}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: notes.length === 0 ? "default" : "pointer", fontFamily: "inherit", opacity: notes.length === 0 ? 0.5 : 1 }}
+                          >
+                            <Printer size={15} /> Télécharger le bulletin
+                          </button>
                         </div>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                           <thead>
