@@ -12,6 +12,10 @@ import {
   import { Frequente } from '../entities/frequente.entity';
   import { Admin } from '../entities/admin.entity';
   import { Eleve } from '../entities/eleve.entity';
+  import { Cours } from '../entities/cours.entity';
+  import { EmploiDuTemps } from '../entities/emploi-du-temps.entity';
+  import { Enseignant } from '../entities/enseignant.entity';
+  import { Titulaire } from '../entities/titulaire.entity';
   import {
     CreateCycleDto, UpdateCycleDto,
     CreateClasseDto, UpdateClasseDto,
@@ -149,6 +153,23 @@ import {
   
     async removeClasse(idClasse: number): Promise<{ message: string }> {
       const classe = await this.findClasseById(idClasse);
+      const m = this.classeRepository.manager;
+      const [salles, cours, creneaux, enseignants] = await Promise.all([
+        m.count(Salle, { where: { classe: { idClasse } } }),
+        m.count(Cours, { where: { classe: { idClasse } } }),
+        m.count(EmploiDuTemps, { where: { classe: { idClasse } } }),
+        m.count(Enseignant, { where: { classe: { idClasse } } }),
+      ]);
+      const liens: string[] = [];
+      if (salles) liens.push(`${salles} salle(s)`);
+      if (cours) liens.push(`${cours} cours`);
+      if (creneaux) liens.push(`${creneaux} créneau(x) d'emploi du temps`);
+      if (enseignants) liens.push(`${enseignants} enseignant(s)`);
+      if (liens.length) {
+        throw new ConflictException(
+          `Impossible de supprimer la classe "${classe.libelle}" : ${liens.join(', ')} y sont rattaché(s). Détachez-les d'abord.`,
+        );
+      }
       await this.classeRepository.remove(classe);
       return { message: `Classe "${classe.libelle}" supprimée` };
     }
@@ -212,6 +233,19 @@ import {
   
     async removeSalle(idSalle: number): Promise<{ message: string }> {
       const salle = await this.findSalleById(idSalle);
+      const m = this.salleRepository.manager;
+      const [frequentations, titulaires] = await Promise.all([
+        m.count(Frequente, { where: { salle: { idSalle } } }),
+        m.count(Titulaire, { where: { salle: { idSalle } } }),
+      ]);
+      const liens: string[] = [];
+      if (frequentations) liens.push(`${frequentations} affectation(s) d'élève`);
+      if (titulaires) liens.push(`${titulaires} titulaire(s)`);
+      if (liens.length) {
+        throw new ConflictException(
+          `Impossible de supprimer la salle "${salle.libelle}" : ${liens.join(', ')} y sont rattaché(s). Détachez-les d'abord.`,
+        );
+      }
       await this.salleRepository.remove(salle);
       return { message: `Salle "${salle.libelle}" supprimée` };
     }

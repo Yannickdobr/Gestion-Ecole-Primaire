@@ -10,6 +10,10 @@ import {
   import { VilleNaissance } from '../entities/ville-naissance.entity';
   import { Admin } from '../entities/admin.entity';
   import { Personne } from '../entities/personne.entity';
+  import { Frequente } from '../entities/frequente.entity';
+  import { Paiement } from '../entities/paiement.entity';
+  import { Evaluation } from '../entities/evaluation.entity';
+  import { Rapport } from '../entities/rapport.entity';
   import { CreateEleveDto, UpdateEleveDto, AddParentDto } from './dto/eleve.dto';
   
   @Injectable()
@@ -148,6 +152,26 @@ import {
     // ─── Supprimer définitivement un élève ────────────────────────────────────
     async remove(matricule: number): Promise<{ message: string }> {
       const eleve = await this.findOne(matricule);
+      const m = this.eleveRepository.manager;
+      const [frequentations, parents, paiements, notes, bulletins] = await Promise.all([
+        m.count(Frequente, { where: { eleve: { matricule } } }),
+        m.count(Parents, { where: { eleve: { matricule } } }),
+        m.count(Paiement, { where: { eleve: { matricule } } }),
+        m.count(Evaluation, { where: { eleve: { matricule } } }),
+        m.count(Rapport, { where: { eleve: { matricule } } }),
+      ]);
+      const liens: string[] = [];
+      if (frequentations) liens.push(`${frequentations} affectation(s)`);
+      if (parents) liens.push(`${parents} lien(s) parent`);
+      if (paiements) liens.push(`${paiements} paiement(s)`);
+      if (notes) liens.push(`${notes} note(s)`);
+      if (bulletins) liens.push(`${bulletins} bulletin(s)`);
+      if (liens.length) {
+        throw new ConflictException(
+          `Impossible de supprimer définitivement cet élève : ${liens.join(', ')} lui sont rattaché(s). ` +
+            `Utilisez plutôt la désactivation pour conserver l'historique.`,
+        );
+      }
       await this.eleveRepository.remove(eleve);
       return { message: `Élève matricule ${matricule} supprimé définitivement` };
     }
