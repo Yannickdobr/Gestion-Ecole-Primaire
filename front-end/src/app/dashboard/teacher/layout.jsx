@@ -2,12 +2,14 @@
 
 import RequireAuth from "@/components/RequireAuth";
 import TopNav from "@/components/TopNav";
-import { Home, CalendarDays, ClipboardCheck, MessageSquare, KeyRound } from "lucide-react";
+import { Home, CalendarDays, ClipboardCheck, MessageSquare, KeyRound, UserCheck, Award } from "lucide-react";
 
 const ITEMS = [
   { tkey: "accueil", label: "Accueil", href: "/dashboard/teacher", icon: <Home size={18} /> },
   { tkey: "schedule", label: "Emploi du temps", href: "/dashboard/teacher/schedule", icon: <CalendarDays size={18} /> },
   { tkey: "grades", label: "Évaluations", href: "/dashboard/teacher/grades", icon: <ClipboardCheck size={18} /> },
+  { tkey: "appel", label: "Appel", href: "/dashboard/teacher/appel", icon: <UserCheck size={18} /> },
+  { tkey: "bulletins", label: "Bulletins", href: "/dashboard/teacher/bulletins", icon: <Award size={18} /> },
   { tkey: "messages", label: "Messagerie", href: "/dashboard/teacher/messages", icon: <MessageSquare size={18} /> },
 ];
 

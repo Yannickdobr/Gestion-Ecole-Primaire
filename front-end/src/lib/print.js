@@ -71,3 +71,38 @@ export function imprimerBulletin({ eleve, session, notes, moyenne, rang = null, 
     <div class="total"><span>Moyenne générale${rang ? ` · Rang ${rang}${effectif ? "/" + effectif : ""}` : ""}</span><span>${moyenne != null ? Math.round(moyenne * 100) / 100 : "—"}/20</span></div>`;
   ouvrirImpression(`Bulletin_${eleve?.matricule || ""}`, corps);
 }
+
+/** PV de délibération (décisions de passage d'une classe). */
+export function imprimerPV({ classe, session, annee, lignes }) {
+  const rows = (lignes || []).map((l, i) =>
+    `<tr><td>${i + 1}</td><td>${esc(l.prenom)} ${esc(l.nom)}</td><td>#${esc(l.matricule)}</td><td><b>${l.moyenne != null ? Math.round(l.moyenne * 100) / 100 + "/20" : "—"}</b></td><td>${esc(l.decision || "—")}</td></tr>`,
+  ).join("");
+  const corps = `
+    <h1>Procès-verbal de délibération</h1>
+    <div class="meta">Classe ${esc(classe || "—")}${session ? ` · ${esc(session)}` : ""}${annee ? ` · ${esc(annee)}` : ""}</div>
+    <table><thead><tr><th>#</th><th>Élève</th><th>Matricule</th><th>Moyenne</th><th>Décision</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">Aucune décision.</td></tr>'}</tbody></table>
+    <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:12px;color:#4a3728">
+      <div>Le Directeur<br/><br/>__________________</div>
+      <div>Le Titulaire<br/><br/>__________________</div>
+    </div>`;
+  ouvrirImpression(`PV_${esc(classe || "")}`, corps);
+}
+
+/** Carte d'élève (format simple imprimable). */
+export function imprimerCarte({ eleve, classe, annee }) {
+  const corps = `
+    <h1>Carte d'élève</h1>
+    <div class="meta">Année ${esc(annee || "—")}</div>
+    <div style="display:flex;gap:24px;align-items:center;margin:20px 0;padding:18px;border:2px solid #d86310;border-radius:12px">
+      ${eleve?.photoURL && eleve.photoURL !== "INDEFINI" ? `<img src="${esc(eleve.photoURL)}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid #eee"/>` : `<div style="width:96px;height:96px;border-radius:8px;background:#faf6f1;display:flex;align-items:center;justify-content:center;color:#8a7060;font-size:12px">Photo</div>`}
+      <div class="grid" style="grid-template-columns:1fr">
+        <div><b>Nom :</b> ${esc(eleve?.nom)}</div>
+        <div><b>Prénom :</b> ${esc(eleve?.prenom)}</div>
+        <div><b>Matricule :</b> #${esc(eleve?.matricule)}</div>
+        <div><b>Classe :</b> ${esc(classe || "—")}</div>
+        <div><b>Né(e) le :</b> ${fmtDate(eleve?.dateNaissance)}</div>
+      </div>
+    </div>`;
+  ouvrirImpression(`Carte_${eleve?.matricule || ""}`, corps);
+}

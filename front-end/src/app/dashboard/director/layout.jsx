@@ -6,6 +6,7 @@ import {
   Home, CalendarDays, GraduationCap, Users, Layers, ClipboardCheck,
   FileText, UserCheck, CreditCard, MessageSquare, Settings, HelpCircle,
   Award, ShieldAlert, BookOpen, FileCheck, ClipboardList, MapPin,
+  Gavel, BarChart3,
 } from "lucide-react";
 
 // manager:true → réservé à la direction (caché pour l'Admin standard)
@@ -18,6 +19,8 @@ const ITEMS = [
   { tkey: "academic", label: "Académique", href: "/dashboard/director/academic", icon: <Layers size={18} />, manager: true },
   { tkey: "grades", label: "Évaluations", href: "/dashboard/director/grades", icon: <ClipboardCheck size={18} /> },
   { tkey: "bulletins", label: "Bulletins", href: "/dashboard/director/bulletins", icon: <Award size={18} /> },
+  { tkey: "deliberation", label: "Délibération", href: "/dashboard/director/deliberation", icon: <Gavel size={18} />, manager: true },
+  { tkey: "stats", label: "Statistiques", href: "/dashboard/director/stats", icon: <BarChart3 size={18} /> },
   { tkey: "discipline", label: "Discipline", href: "/dashboard/director/discipline", icon: <ShieldAlert size={18} /> },
   { tkey: "justificatifs", label: "Justificatifs", href: "/dashboard/director/justificatifs", icon: <FileCheck size={18} /> },
   { tkey: "bibliotheque", label: "Bibliothèque", href: "/dashboard/director/bibliotheque", icon: <BookOpen size={18} /> },
