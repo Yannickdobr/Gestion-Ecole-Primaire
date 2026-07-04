@@ -85,9 +85,11 @@ async function bootstrap() {
   });
   // ─────────────────────────────────────────────────────────────────────────
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
-  console.log(`🚀 Serveur démarré sur http://localhost:${port}/api`);
-  console.log(`📚 Swagger disponible sur http://localhost:${port}/docs`);
+  const port = Number(process.env.PORT) || 3000;
+  // ⚠️ Écouter sur 0.0.0.0 (toutes les interfaces) — indispensable sur Render/conteneurs,
+  // sinon le service démarre mais reste injoignable de l'extérieur (« loads then times out »).
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Serveur démarré sur le port ${port} (préfixe /api)`);
+  console.log(`📚 Swagger disponible sur /docs`);
 }
 bootstrap();
