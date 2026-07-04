@@ -26,7 +26,7 @@
         "name": "next"
       }
     ],
-    "moduleResolution": "node"
+    "moduleResolution": "bundler"
   },
   "include": [
     "**/*.ts",
