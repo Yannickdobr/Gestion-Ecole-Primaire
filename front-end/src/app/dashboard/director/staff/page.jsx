@@ -13,6 +13,7 @@ import {
   createPersonne,
   createEnseignant,
   createTitulaire,
+  updateTitulaireSalle,
   getCours,
   getClasses,
   getPersonnesTous,
@@ -103,6 +104,9 @@ function StaffPage() {
   const [tab, setTab] = useState("enseignants"); // 'enseignants' | 'titulaires'
   const [enseignants, setEnseignants] = useState([]);
   const [titulaires, setTitulaires] = useState([]);
+  const [titEdit, setTitEdit] = useState(null); // titulaire en cours de réaffectation
+  const [titEditSalle, setTitEditSalle] = useState("");
+  const [titEditErr, setTitEditErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null); // id en cours d'action
@@ -301,6 +305,20 @@ function StaffPage() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  // Réaffecter un titulaire à une autre salle
+  const enregistrerTitSalle = async (e) => {
+    e.preventDefault();
+    setTitEditErr("");
+    if (!titEditSalle) { setTitEditErr("Choisis une salle."); return; }
+    setEnvoi(true);
+    try {
+      await updateTitulaireSalle(titEdit.idTitulaire, Number(titEditSalle));
+      setTitEdit(null);
+      await charger();
+    } catch (err) { setTitEditErr(err.message || "Échec de la réaffectation."); }
+    finally { setEnvoi(false); }
   };
 
   const personnelNonParent = personnes.filter((p) => Number(p.typePersonne) !== 4);
@@ -530,14 +548,24 @@ function StaffPage() {
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{tit.salle?.libelle || "—"}</td>
                     <td style={tdStyle}><StatutBadge actif={tit.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
-                      <button
-                        onClick={() => desactiverTit(tit)}
-                        disabled={busyId === `tit-${tit.idTitulaire}` || Number(tit.actif) !== 1}
-                        style={actionBtnStyle(true, Number(tit.actif) !== 1)}
-                      >
-                        <PowerOff size={14} />
-                        {busyId === `tit-${tit.idTitulaire}` ? "…" : "Désactiver"}
-                      </button>
+                      <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => { setTitEdit(tit); setTitEditSalle(tit.salle?.idSalle ? String(tit.salle.idSalle) : ""); setTitEditErr(""); }}
+                          disabled={busyId === `tit-${tit.idTitulaire}`}
+                          title="Changer la salle"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          <MapPin size={14} /> Salle
+                        </button>
+                        <button
+                          onClick={() => desactiverTit(tit)}
+                          disabled={busyId === `tit-${tit.idTitulaire}` || Number(tit.actif) !== 1}
+                          style={actionBtnStyle(true, Number(tit.actif) !== 1)}
+                        >
+                          <PowerOff size={14} />
+                          {busyId === `tit-${tit.idTitulaire}` ? "…" : "Désactiver"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -546,6 +574,31 @@ function StaffPage() {
           </table>
         )}
       </div>
+
+      {/* ── Modal Réaffecter un titulaire ── */}
+      {titEdit && (
+        <div onClick={() => !envoi && setTitEdit(null)} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, background: "#fff", borderRadius: 20, padding: 26, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>Salle du titulaire</h2>
+              <button onClick={() => setTitEdit(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={20} /></button>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16 }}><b>{titEdit.personne?.prenom} {titEdit.personne?.nom}</b> — salle actuelle : {titEdit.salle?.libelle || "—"}</p>
+            <form onSubmit={enregistrerTitSalle}>
+              <label style={labelStyle}>Nouvelle salle *</label>
+              <select style={inputStyle} value={titEditSalle} onChange={(e) => setTitEditSalle(e.target.value)}>
+                <option value="">— Choisir une salle —</option>
+                {salles.map((s) => <option key={s.idSalle} value={s.idSalle}>{s.libelle} — {s.classe?.libelle || "sans classe"}</option>)}
+              </select>
+              {titEditErr && <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 13 }}>{titEditErr}</div>}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                <button type="button" onClick={() => setTitEdit(null)} disabled={envoi} style={{ padding: "11px 20px", borderRadius: 12, border: "1.5px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                <button type="submit" disabled={envoi} style={{ padding: "11px 24px", borderRadius: 12, border: "none", background: envoi ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{envoi ? "Enregistrement…" : "Réaffecter"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal Nouveau membre du personnel ── */}
       {modalOuvert && (
