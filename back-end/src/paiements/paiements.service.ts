@@ -16,6 +16,7 @@ import { Cycle } from '../entities/cycle.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
 import { NotificationService } from '../common/notification.service';
+import { verifierAvantSuppression } from '../common/referential-integrity';
 import {
   CreateModeDto, UpdateModeDto,
   CreateScolariteDto, UpdateScolariteDto,
@@ -133,6 +134,11 @@ export class PaiementsService {
 
   async removeMode(idMode: number): Promise<{ message: string }> {
     const mode = await this.findModeById(idMode);
+    await verifierAvantSuppression(
+      this.modeRepository.manager,
+      `le mode "${mode.libelle}"`,
+      [{ entity: Paiement, where: { mode: { idMode } }, label: (n) => `${n} paiement(s)` }],
+    );
     await this.modeRepository.remove(mode);
     return { message: `Mode "${mode.libelle}" supprimé` };
   }
@@ -198,6 +204,11 @@ export class PaiementsService {
 
   async removeScolarite(idScolarite: number): Promise<{ message: string }> {
     const s = await this.findScolariteById(idScolarite);
+    await verifierAvantSuppression(
+      this.scolariteRepository.manager,
+      `cette scolarité`,
+      [{ entity: Tranches, where: { scolarite: { idScolarite } }, label: (n) => `${n} tranche(s)` }],
+    );
     await this.scolariteRepository.remove(s);
     return { message: `Scolarité id ${idScolarite} supprimée` };
   }

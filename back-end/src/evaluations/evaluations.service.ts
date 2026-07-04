@@ -17,6 +17,7 @@ import { Cours } from '../entities/cours.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
 import { NotificationService } from '../common/notification.service';
+import { verifierAvantSuppression } from '../common/referential-integrity';
 import {
   CreateTrimestreDto, UpdateTrimestreDto,
   CreateSessionDto, UpdateSessionDto,
@@ -123,6 +124,11 @@ export class EvaluationsService {
 
   async removeTrimestre(idTrimes: number): Promise<{ message: string }> {
     const t = await this.findTrimestreById(idTrimes);
+    await verifierAvantSuppression(
+      this.trimestreRepository.manager,
+      `le trimestre "${t.libelle}"`,
+      [{ entity: Session, where: { trimestre: { idTrimes } }, label: (n) => `${n} session(s)` }],
+    );
     await this.trimestreRepository.remove(t);
     return { message: `Trimestre "${t.libelle}" supprimé` };
   }
@@ -181,6 +187,11 @@ export class EvaluationsService {
 
   async removeSession(idSession: number): Promise<{ message: string }> {
     const s = await this.findSessionById(idSession);
+    await verifierAvantSuppression(
+      this.sessionRepository.manager,
+      `la session "${s.libelle}"`,
+      [{ entity: Evaluation, where: { session: { idSession } }, label: (n) => `${n} note(s)` }],
+    );
     await this.sessionRepository.remove(s);
     return { message: `Session "${s.libelle}" supprimée` };
   }
@@ -215,6 +226,11 @@ export class EvaluationsService {
 
   async removeNature(idNature: number): Promise<{ message: string }> {
     const n = await this.findNatureById(idNature);
+    await verifierAvantSuppression(
+      this.natureRepository.manager,
+      `la nature "${n.libelle}"`,
+      [{ entity: Epreuve, where: { nature: { idNature } }, label: (c) => `${c} épreuve(s)` }],
+    );
     await this.natureRepository.remove(n);
     return { message: `Nature "${n.libelle}" supprimée` };
   }
@@ -265,6 +281,11 @@ export class EvaluationsService {
 
   async removeEpreuve(idEpreuve: number): Promise<{ message: string }> {
     const e = await this.findEpreuveById(idEpreuve);
+    await verifierAvantSuppression(
+      this.epreuveRepository.manager,
+      `l'épreuve "${e.libelle}"`,
+      [{ entity: Evaluation, where: { epreuve: { idEpreuve } }, label: (n) => `${n} note(s)` }],
+    );
     await this.epreuveRepository.remove(e);
     return { message: `Épreuve "${e.libelle}" supprimée` };
   }

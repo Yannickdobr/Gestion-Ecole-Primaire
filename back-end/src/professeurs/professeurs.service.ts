@@ -174,16 +174,20 @@ export class ProfesseursService {
     const personne = await this.personneRepository.findOne({ where: { idPers } });
     if (!personne) throw new NotFoundException('Personne introuvable');
 
-    const ens = await this.enseignantRepository.find({ where: { personne: { idPers } } });
-    if (ens.length) await this.enseignantRepository.remove(ens);
-    const tits = await this.titulaireRepository.find({ where: { personne: { idPers } } });
-    if (tits.length) await this.titulaireRepository.remove(tits);
-
+    // Transaction : on retire les rôles (enseignant/titulaire) puis le compte.
+    // Si le compte est encore référencé ailleurs (parent, messages, notes…), tout
+    // est annulé (rollback) — pas de suppression partielle — et on renvoie un 409.
     try {
-      await this.personneRepository.remove(personne);
+      await this.personneRepository.manager.transaction(async (m) => {
+        const ens = await m.find(Enseignant, { where: { personne: { idPers } } });
+        if (ens.length) await m.remove(ens);
+        const tits = await m.find(Titulaire, { where: { personne: { idPers } } });
+        if (tits.length) await m.remove(tits);
+        await m.remove(personne);
+      });
     } catch {
       throw new ConflictException(
-        "Suppression impossible : ce compte est lié à d'autres données (messages, notes, paiements, parent…).",
+        "Suppression impossible : ce compte est encore lié à d'autres données (parent d'élève, messages, notes, paiements…). Désactivez-le plutôt.",
       );
     }
     return { message: 'Compte supprimé' };

@@ -16,6 +16,11 @@ import {
   import { EmploiDuTemps } from '../entities/emploi-du-temps.entity';
   import { Enseignant } from '../entities/enseignant.entity';
   import { Titulaire } from '../entities/titulaire.entity';
+  import { Scolarite } from '../entities/scolarite.entity';
+  import { Paiement } from '../entities/paiement.entity';
+  import { Rapport } from '../entities/rapport.entity';
+  import { Trimestre } from '../entities/trimestre.entity';
+  import { verifierAvantSuppression } from '../common/referential-integrity';
   import {
     CreateCycleDto, UpdateCycleDto,
     CreateClasseDto, UpdateClasseDto,
@@ -90,6 +95,14 @@ import {
   
     async removeCycle(idCycle: number): Promise<{ message: string }> {
       const cycle = await this.findCycleById(idCycle);
+      await verifierAvantSuppression(
+        this.cycleRepository.manager,
+        `le cycle "${cycle.libelle}"`,
+        [
+          { entity: Classe, where: { cycle: { idCycle } }, label: (n) => `${n} classe(s)` },
+          { entity: Scolarite, where: { cycle: { idCycle } }, label: (n) => `${n} scolarité(s)` },
+        ],
+      );
       await this.cycleRepository.remove(cycle);
       return { message: `Cycle "${cycle.libelle}" supprimé` };
     }
@@ -289,6 +302,16 @@ import {
   
     async removeAnnee(idAnnee: number): Promise<{ message: string }> {
       const annee = await this.findAnneeById(idAnnee);
+      await verifierAvantSuppression(
+        this.anneeRepository.manager,
+        `l'année "${annee.libelle}"`,
+        [
+          { entity: Frequente, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} affectation(s)` },
+          { entity: Paiement, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} paiement(s)` },
+          { entity: Rapport, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} bulletin(s)` },
+          { entity: Trimestre, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} trimestre(s)` },
+        ],
+      );
       await this.anneeRepository.remove(annee);
       return { message: `Année "${annee.libelle}" supprimée` };
     }

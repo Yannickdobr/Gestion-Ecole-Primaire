@@ -11,6 +11,10 @@ import { Specialite } from '../entities/specialite.entity';
 import { Livres } from '../entities/livres.entity';
 import { Classe } from '../entities/classe.entity';
 import { Admin } from '../entities/admin.entity';
+import { EmploiDuTemps } from '../entities/emploi-du-temps.entity';
+import { Enseignant } from '../entities/enseignant.entity';
+import { Evaluation } from '../entities/evaluation.entity';
+import { verifierAvantSuppression } from '../common/referential-integrity';
 import {
   CreateCoursDto, UpdateCoursDto,
   CreateDisciplineDto, UpdateDisciplineDto,
@@ -123,6 +127,16 @@ export class CoursService {
 
   async removeCours(idCours: number): Promise<{ message: string }> {
     const cours = await this.findCoursById(idCours);
+    await verifierAvantSuppression(
+      this.coursRepository.manager,
+      `le cours "${cours.libelle}"`,
+      [
+        { entity: EmploiDuTemps, where: { cours: { idCours } }, label: (n) => `${n} créneau(x) d'emploi du temps` },
+        { entity: Enseignant, where: { cours: { idCours } }, label: (n) => `${n} enseignant(s)` },
+        { entity: Evaluation, where: { cours: { idCours } }, label: (n) => `${n} note(s)` },
+      ],
+      'Désactivez-le plutôt pour conserver l\'historique.',
+    );
     await this.coursRepository.remove(cours);
     return { message: `Cours "${cours.libelle}" supprimé` };
   }
@@ -230,6 +244,11 @@ export class CoursService {
 
   async removeSpecialite(idSpecialite: number): Promise<{ message: string }> {
     const spe = await this.findSpecialiteById(idSpecialite);
+    await verifierAvantSuppression(
+      this.specialiteRepository.manager,
+      `la spécialité "${spe.libelle}"`,
+      [{ entity: Livres, where: { specialite: { idSpecialite } }, label: (n) => `${n} livre(s)` }],
+    );
     await this.specialiteRepository.remove(spe);
     return { message: `Spécialité "${spe.libelle}" supprimée` };
   }

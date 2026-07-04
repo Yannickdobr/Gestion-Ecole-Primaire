@@ -9,6 +9,7 @@ import { Enseignant } from '../entities/enseignant.entity';
 import { AnneeAcademique } from '../entities/annee-academique.entity';
 import { Personne } from '../entities/personne.entity';
 import { Admin } from '../entities/admin.entity';
+import { verifierAvantSuppression } from '../common/referential-integrity';
 import {
   CreateJustificatifDto, CreateFicheEnseignantDto, CreateQuartierDto, CreateResidentDto,
 } from './dto/administration.dto';
@@ -121,6 +122,11 @@ export class AdministrationService {
   async removeQuartier(idQuartier: number): Promise<{ message: string }> {
     const q = await this.quartierRepo.findOne({ where: { idQuartier } });
     if (!q) throw new NotFoundException(`Quartier introuvable (id: ${idQuartier})`);
+    await verifierAvantSuppression(
+      this.quartierRepo.manager,
+      `le quartier "${q.libelle}"`,
+      [{ entity: Residents, where: { quartier: { idQuartier } }, label: (n) => `${n} résident(s)` }],
+    );
     await this.quartierRepo.remove(q);
     return { message: `Quartier "${q.libelle}" supprimé` };
   }
