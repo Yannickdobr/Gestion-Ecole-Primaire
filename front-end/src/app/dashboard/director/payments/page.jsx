@@ -8,9 +8,9 @@ import { imprimerRecu } from "@/lib/print";
 import {
   getEleves, getPaiementsEleve, getModes, createModePaiement,
   getScolarites, createScolarite, createTranche, enregistrerPaiement, getArrieresAuto,
-  getCycles, getAnnees, getPersonnesTous,
+  getCycles, getAnnees, getPersonnesTous, envoyerRappelsImpayes,
 } from "@/lib/api";
-import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock, Printer, FileText } from "lucide-react";
+import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock, Printer, FileText, BellRing } from "lucide-react";
 import BilanClasse from "./BilanClasse";
 
 const thStyle = { padding: "12px 20px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -43,6 +43,23 @@ export default function PaymentsPage() {
   const [verModal, setVerModal] = useState(false);
   const [verForm, setVerForm] = useState({ montant: "", datePaie: "", idMode: "", idPers: "" });
   const [envoi, setEnvoi] = useState(false);
+  // Rappels d'impayés (BF-23)
+  const [rappelBusy, setRappelBusy] = useState(false);
+  const [rappelInfo, setRappelInfo] = useState("");
+
+  const lancerRappels = async () => {
+    if (!idAca) { setRappelInfo("Choisis d'abord l'année académique."); return; }
+    if (!confirm("Envoyer un rappel (message + email) aux parents de tous les élèves ayant un solde de scolarité impayé ?")) return;
+    setRappelBusy(true); setRappelInfo("");
+    try {
+      const r = await envoyerRappelsImpayes(Number(idAca));
+      setRappelInfo(`Rappels envoyés : ${r?.elevesEnRetard ?? 0} élève(s) en retard notifié(s).`);
+    } catch (e) {
+      setRappelInfo(e?.message || "Échec de l'envoi des rappels.");
+    } finally {
+      setRappelBusy(false);
+    }
+  };
   const [verErreur, setVerErreur] = useState("");
 
   // Scolarité
@@ -183,6 +200,13 @@ export default function PaymentsPage() {
           const active = tab === tb.key;
           return <button key={tb.key} onClick={() => setTab(tb.key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: active ? "linear-gradient(135deg, var(--orange), var(--brown))" : "var(--surface)", color: active ? "white" : "var(--muted)", boxShadow: active ? "0 4px 12px rgba(216,99,16,0.25)" : "none" }}>{tb.icon}{tb.label}</button>;
         })}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <button onClick={lancerRappels} disabled={rappelBusy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "1px solid var(--surface-border)", cursor: rappelBusy ? "default" : "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "var(--surface)", color: "var(--brown)", opacity: rappelBusy ? 0.6 : 1 }}>
+          <BellRing size={16} />{rappelBusy ? "Envoi…" : "Envoyer les rappels d'impayés"}
+        </button>
+        {rappelInfo && <span style={{ fontSize: 13, color: "var(--muted)" }}>{rappelInfo}</span>}
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}

@@ -209,6 +209,9 @@ export const verifierConflitsEmploi = (data) =>
 export const getPaiementsEleve = (matricule) =>
   apiFetch(`/paiements/eleve/${matricule}`);
 export const getPaiementsAnnee = (idAca) => apiFetch(`/paiements/annee/${idAca}`);
+/** BF-23 : envoie les rappels d'impayés aux parents (Direction/Scolarité). */
+export const envoyerRappelsImpayes = (idAca) =>
+  apiFetch(`/paiements/rappels-impayes/${idAca}`, { method: "POST" });
 
 export const getModes = () => apiFetch("/paiements/modes");
 export const createModePaiement = (data) =>
