@@ -5,13 +5,18 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { EmploiService } from './emploi.service';
 import { CreateEmploiDuTempsDto, UpdateEmploiDuTempsDto, CreateJourSemaineDto, UpdateJourSemaineDto } from './dto/emploi.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { DIRECTION } from '../auth/roles.enum';
 
 @ApiTags('Emploi du Temps')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('emploi')
 export class EmploiController {
   constructor(private readonly emploiService: EmploiService) {}
+
+  // Lecture ouverte au personnel (enseignants consultent) ; écriture réservée à la direction.
 
   // ── Jours ─────────────────────────────────────────────────────────────
   @Get('jours')
@@ -19,11 +24,13 @@ export class EmploiController {
   findAllJours() { return this.emploiService.findAllJours(); }
 
   @Post('jours')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un jour' })
   createJour(@Body() dto: CreateJourSemaineDto) { return this.emploiService.createJour(dto); }
 
   @Post('jours/seed')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: '⚡ Initialiser Lundi → Samedi (à faire une seule fois)' })
   seedJours() { return this.emploiService.seedJours(); }
@@ -33,10 +40,12 @@ export class EmploiController {
   findJour(@Param('id', ParseIntPipe) id: number) { return this.emploiService.findJourById(id); }
 
   @Put('jours/:id')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Modifier un jour' })
   updateJour(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateJourSemaineDto) { return this.emploiService.updateJour(id, dto); }
 
   @Delete('jours/:id')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un jour' })
   removeJour(@Param('id', ParseIntPipe) id: number) { return this.emploiService.removeJour(id); }
@@ -47,11 +56,13 @@ export class EmploiController {
   findAll() { return this.emploiService.findAll(); }
 
   @Post()
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un créneau (détecte automatiquement les conflits)' })
   createCreneau(@Body() dto: CreateEmploiDuTempsDto) { return this.emploiService.createCreneau(dto); }
 
   @Post('verifier-conflits')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Vérifier les conflits sans créer le créneau' })
   verifierConflits(@Body() dto: CreateEmploiDuTempsDto) { return this.emploiService.verifierConflits(dto); }
@@ -78,15 +89,18 @@ export class EmploiController {
   findCreneau(@Param('id', ParseIntPipe) id: number) { return this.emploiService.findCreneauById(id); }
 
   @Put(':id')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Modifier un créneau' })
   updateCreneau(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmploiDuTempsDto) { return this.emploiService.updateCreneau(id, dto); }
 
   @Delete(':id')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un créneau' })
   removeCreneau(@Param('id', ParseIntPipe) id: number) { return this.emploiService.removeCreneau(id); }
 
   @Delete('classe/:idClasse/reset')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Vider l\'emploi du temps d\'une classe' })
   resetEmploiClasse(@Param('idClasse', ParseIntPipe) idClasse: number) { return this.emploiService.removeAllByClasse(idClasse); }

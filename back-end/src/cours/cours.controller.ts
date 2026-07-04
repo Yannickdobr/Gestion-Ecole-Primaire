@@ -8,10 +8,13 @@ import {
   CreateSpecialiteDto, UpdateSpecialiteDto, CreateLivreDto, UpdateLivreDto,
 } from './dto/cours.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role, DIRECTION } from '../auth/roles.enum';
 
 @ApiTags('Cours')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('cours')
 export class CoursController {
   constructor(private readonly coursService: CoursService) {}
@@ -21,6 +24,7 @@ export class CoursController {
   findAllCours() { return this.coursService.findAllCours(); }
 
   @Post()
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un cours' })
   createCours(@Body() dto: CreateCoursDto) { return this.coursService.createCours(dto); }
@@ -44,6 +48,7 @@ export class CoursController {
   findAllDisciplines() { return this.coursService.findAllDisciplines(); }
 
   @Post('disciplines')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer une discipline' })
   createDiscipline(@Body() dto: CreateDisciplineDto) { return this.coursService.createDiscipline(dto); }
@@ -53,10 +58,12 @@ export class CoursController {
   findDiscipline(@Param('id', ParseIntPipe) id: number) { return this.coursService.findDisciplineById(id); }
 
   @Put('disciplines/:id')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Modifier une discipline' })
   updateDiscipline(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDisciplineDto) { return this.coursService.updateDiscipline(id, dto); }
 
   @Delete('disciplines/:id')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une discipline' })
   removeDiscipline(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeDiscipline(id); }
@@ -67,6 +74,7 @@ export class CoursController {
   findAllSpecialites() { return this.coursService.findAllSpecialites(); }
 
   @Post('specialites')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer une spécialité' })
   createSpecialite(@Body() dto: CreateSpecialiteDto) { return this.coursService.createSpecialite(dto); }
@@ -76,20 +84,24 @@ export class CoursController {
   findSpecialite(@Param('id', ParseIntPipe) id: number) { return this.coursService.findSpecialiteById(id); }
 
   @Put('specialites/:id')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Modifier une spécialité' })
   updateSpecialite(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSpecialiteDto) { return this.coursService.updateSpecialite(id, dto); }
 
   @Delete('specialites/:id')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une spécialité' })
   removeSpecialite(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeSpecialite(id); }
 
   // ── Livres ─────────────────────────────────────────────────────────────
+  // La bibliothèque est gérée par la direction ET le personnel « Autres ».
   @Get('livres')
   @ApiOperation({ summary: 'Catalogue complet des livres' })
   findAllLivres() { return this.coursService.findAllLivres(); }
 
   @Post('livres')
+  @Roles(...DIRECTION, Role.AUTRES)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Ajouter un livre au catalogue' })
   createLivre(@Body() dto: CreateLivreDto) { return this.coursService.createLivre(dto); }
@@ -108,10 +120,12 @@ export class CoursController {
   findLivre(@Param('id', ParseIntPipe) id: number) { return this.coursService.findLivreById(id); }
 
   @Put('livres/:id')
+  @Roles(...DIRECTION, Role.AUTRES)
   @ApiOperation({ summary: 'Modifier un livre' })
   updateLivre(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateLivreDto) { return this.coursService.updateLivre(id, dto); }
 
   @Delete('livres/:id')
+  @Roles(...DIRECTION, Role.AUTRES)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un livre' })
   removeLivre(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeLivre(id); }
@@ -122,14 +136,17 @@ export class CoursController {
   findCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.findCoursById(id); }
 
   @Put(':id')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Modifier un cours' })
   updateCours(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCoursDto) { return this.coursService.updateCours(id, dto); }
 
   @Patch(':id/desactiver')
+  @Roles(...DIRECTION)
   @ApiOperation({ summary: 'Désactiver un cours' })
   desactiverCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.desactiverCours(id); }
 
   @Delete(':id')
+  @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un cours' })
   removeCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeCours(id); }

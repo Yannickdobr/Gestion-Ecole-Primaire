@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, HttpCode, HttpStatus, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaiementsService } from './paiements.service';
@@ -9,13 +9,22 @@ import {
 } from './dto/paiements.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FondateurGuard } from '../auth/fondateur.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role, DIRECTION } from '../auth/roles.enum';
+import { AccessControlService } from '../common/access-control.service';
 
 @ApiTags('Paiements')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+// Par défaut, la gestion financière est réservée à la direction et à la scolarité (comptable).
+@Roles(...DIRECTION, Role.SCOLARITE)
 @Controller('paiements')
 export class PaiementsController {
-  constructor(private readonly paiementsService: PaiementsService) {}
+  constructor(
+    private readonly paiementsService: PaiementsService,
+    private readonly acl: AccessControlService,
+  ) {}
 
   // ── Modes ─────────────────────────────────────────────────────────────
   @Get('modes')
@@ -99,8 +108,12 @@ export class PaiementsController {
   enregistrerPaiement(@Body() dto: CreatePaiementDto) { return this.paiementsService.enregistrerPaiement(dto); }
 
   @Get('eleve/:matricule')
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT) // un parent voit les paiements de SES enfants
   @ApiOperation({ summary: 'Historique des paiements d\'un élève' })
-  findPaiementsByEleve(@Param('matricule', ParseIntPipe) matricule: number) { return this.paiementsService.findPaiementsByEleve(matricule); }
+  async findPaiementsByEleve(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
+    await this.acl.assertEleveAccess(req.user, matricule);
+    return this.paiementsService.findPaiementsByEleve(matricule);
+  }
 
   @Get('annee/:idAca')
   @ApiOperation({ summary: 'Paiements d\'une année académique' })
@@ -121,17 +134,27 @@ export class PaiementsController {
 
   // ── Arriérés ──────────────────────────────────────────────────────────
   @Get('arrieres/:matricule/annee/:idAca')
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT)
   @ApiOperation({ summary: 'Calculer les arriérés d\'un élève (sans scolarité)' })
-  calculerArrieres(
+  async calculerArrieres(
+    @Request() req,
     @Param('matricule', ParseIntPipe) matricule: number,
     @Param('idAca', ParseIntPipe) idAca: number,
-  ) { return this.paiementsService.calculerArrieres(matricule, idAca); }
+  ) {
+    await this.acl.assertEleveAccess(req.user, matricule);
+    return this.paiementsService.calculerArrieres(matricule, idAca);
+  }
 
   @Get('arrieres/:matricule/annee/:idAca/cycle/:idCycle')
+  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT)
   @ApiOperation({ summary: 'Calculer les arriérés avec scolarité du cycle' })
-  calculerArrieresAvecScolarite(
+  async calculerArrieresAvecScolarite(
+    @Request() req,
     @Param('matricule', ParseIntPipe) matricule: number,
     @Param('idAca', ParseIntPipe) idAca: number,
     @Param('idCycle', ParseIntPipe) idCycle: number,
-  ) { return this.paiementsService.calculerArriereAvecScolarite(matricule, idAca, idCycle); }
+  ) {
+    await this.acl.assertEleveAccess(req.user, matricule);
+    return this.paiementsService.calculerArriereAvecScolarite(matricule, idAca, idCycle);
+  }
 }

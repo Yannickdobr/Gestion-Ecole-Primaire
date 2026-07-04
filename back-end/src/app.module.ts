@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 
 // ─── Modules ──────────────────────────────────────────────────────────────────
 import { AuthModule } from './auth/auth.module';
+import { AccessControlModule } from './common/access-control.module';
 import { ElevesModule } from './eleves/eleves.module';
 import { ProfesseursModule } from './professeurs/professeurs.module';
 import { ClassesModule } from './classe/classes.module';
@@ -104,6 +105,7 @@ import { Residents } from './entities/residents.entity';
     MailModule,
     AdministrationModule,
     UploadModule,
+    AccessControlModule,
   ],
   controllers: [AppController],
   providers: [AppService],

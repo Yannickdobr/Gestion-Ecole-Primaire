@@ -5,10 +5,13 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { MessagerieService } from './messagerie.service';
 import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/messagerie.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { DIRECTION } from '../auth/roles.enum';
 
 @ApiTags('Messagerie')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('messagerie')
 export class MessagerieController {
   constructor(private readonly messagerieService: MessagerieService) {}
@@ -60,6 +63,7 @@ export class MessagerieController {
   createMessage(@Request() req, @Body() dto: CreateMessageDto) { return this.messagerieService.createMessage(dto, req.user); }
 
   @Post('masse')
+  @Roles(...DIRECTION) // l'envoi groupé est réservé à la direction
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Envoyer le même message à plusieurs parents en une fois' })
   envoyerEnMasse(@Request() req, @Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto, req.user); }
