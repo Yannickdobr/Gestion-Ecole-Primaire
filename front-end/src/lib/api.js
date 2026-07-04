@@ -137,6 +137,8 @@ export const createEnseignant = (data) =>
   apiFetch("/professeurs/enseignants", { method: "POST", body: JSON.stringify(data) });
 export const createTitulaire = (data) =>
   apiFetch("/professeurs/titulaires", { method: "POST", body: JSON.stringify(data) });
+export const updateTitulaireSalle = (idTitulaire, idSalle) =>
+  apiFetch(`/professeurs/titulaires/${idTitulaire}/salle`, { method: "PATCH", body: JSON.stringify({ idSalle }) });
 export const activerEnseignant = (id) =>
   apiFetch(`/professeurs/enseignants/${id}/activer`, { method: "PATCH" });
 export const desactiverEnseignant = (id) =>

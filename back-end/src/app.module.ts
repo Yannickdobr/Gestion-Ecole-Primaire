@@ -68,6 +68,11 @@ import { Residents } from './entities/residents.entity';
         username: config.get<string>('DB_USERNAME', 'postgres'),
         password: config.get<string>('DB_PASSWORD', '65732Pauline'),
         database: config.get<string>('DB_NAME', 'ecole_primaire'),
+        // ✅ SSL requis par Aiven (et la plupart des Postgres managés). Activer via DB_SSL=true
+        ssl:
+          String(config.get('DB_SSL') ?? '').toLowerCase() === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
         entities: [
           Admin, Personne, Eleve, Parents, VilleNaissance,
           Enseignant, Titulaire,
