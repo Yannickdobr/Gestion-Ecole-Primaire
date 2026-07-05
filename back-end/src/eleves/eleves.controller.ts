@@ -77,6 +77,11 @@ export class ElevesController {
   @ApiOperation({ summary: 'Désactiver un élève (soft delete)' })
   desactiver(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.desactiver(matricule); }
 
+  @Patch(':matricule/activer')
+  @Roles(...DIRECTION, Role.SCOLARITE)
+  @ApiOperation({ summary: 'Réactiver un élève' })
+  activer(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.activer(matricule); }
+
   @Delete(':matricule')
   @Roles(...DIRECTION, Role.SCOLARITE)
   @HttpCode(HttpStatus.OK)

@@ -5,13 +5,13 @@ import Link from "next/link";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getEleves, createEleve, desactiverEleve, getVilles, seedVilles,
+  getEleves, createEleve, desactiverEleve, activerEleve, getVilles, seedVilles,
   getParentsEleve, createPersonne, addParentToEleve,
   getSalles, getAnnees, affecterEleve, getFrequenteByEleve, reaffecterEleve, deleteEleve,
 } from "@/lib/api";
 import { exporterCSV } from "@/lib/export";
 import FileUpload from "@/components/FileUpload";
-import { GraduationCap, Search, UserPlus, PowerOff, X, Users, Repeat, Eye, Download, Trash2 } from "lucide-react";
+import { GraduationCap, Search, UserPlus, PowerOff, Power, X, Users, Repeat, Eye, Download, Trash2 } from "lucide-react";
 
 function Avatar({ prenom = "", nom = "" }) {
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "?";
@@ -212,6 +212,19 @@ export default function StudentsPage() {
     setError("");
     try {
       await desactiverEleve(e.matricule);
+      await charger();
+    } catch (err) {
+      setError(err.message || "Action impossible.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const reactiver = async (e) => {
+    setBusyId(e.matricule);
+    setError("");
+    try {
+      await activerEleve(e.matricule);
       await charger();
     } catch (err) {
       setError(err.message || "Action impossible.");
@@ -450,14 +463,25 @@ export default function StudentsPage() {
                           <Repeat size={14} />
                           Classe
                         </button>
-                        <button
-                          onClick={() => desactiver(e)}
-                          disabled={busyId === e.matricule || Number(e.actif) !== 1}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: Number(e.actif) !== 1 ? "#f1f0ee" : "var(--surface)", color: Number(e.actif) !== 1 ? "#b8a9a0" : "#ef4444", fontSize: 13, fontWeight: 600, cursor: Number(e.actif) !== 1 ? "not-allowed" : "pointer", fontFamily: "inherit" }}
-                        >
-                          <PowerOff size={14} />
-                          {busyId === e.matricule ? "…" : "Désactiver"}
-                        </button>
+                        {Number(e.actif) === 1 ? (
+                          <button
+                            onClick={() => desactiver(e)}
+                            disabled={busyId === e.matricule}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            <PowerOff size={14} />
+                            {busyId === e.matricule ? "…" : "Désactiver"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => reactiver(e)}
+                            disabled={busyId === e.matricule}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#16a34a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            <Power size={14} />
+                            {busyId === e.matricule ? "…" : "Réactiver"}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleSupprimerEleve(e)}
                           disabled={busyId === e.matricule}

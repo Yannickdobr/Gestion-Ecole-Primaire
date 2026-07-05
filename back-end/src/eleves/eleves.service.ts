@@ -148,6 +148,13 @@ import {
       await this.eleveRepository.save(eleve);
       return { message: `Élève ${eleve.prenom} ${eleve.nom} désactivé avec succès` };
     }
+
+    async activer(matricule: number): Promise<{ message: string }> {
+      const eleve = await this.findOne(matricule);
+      eleve.actif = 1;
+      await this.eleveRepository.save(eleve);
+      return { message: `Élève ${eleve.prenom} ${eleve.nom} réactivé avec succès` };
+    }
   
     // ─── Supprimer définitivement un élève ────────────────────────────────────
     async remove(matricule: number): Promise<{ message: string }> {

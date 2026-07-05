@@ -117,6 +117,8 @@ export const createEleve = (data) =>
   apiFetch("/eleves", { method: "POST", body: JSON.stringify(data) });
 export const desactiverEleve = (matricule) =>
   apiFetch(`/eleves/${matricule}/desactiver`, { method: "PATCH" });
+export const activerEleve = (matricule) =>
+  apiFetch(`/eleves/${matricule}/activer`, { method: "PATCH" });
 export const getParentsEleve = (matricule) =>
   apiFetch(`/eleves/${matricule}/parents`);
 
