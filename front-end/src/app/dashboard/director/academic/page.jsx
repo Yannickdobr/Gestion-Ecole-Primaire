@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   getCycles, getClasses, getCours, getSalles,
   createCycle, createClasse, createCours, createSalle,
-  updateCycle, updateClasse, updateCours, updateSalle, deleteSalle, deleteClasse,
+  updateCycle, updateClasse, updateCours, updateSalle, deleteSalle, deleteClasse, deleteCycle, deleteCours,
 } from "@/lib/api";
 import { Layers, Plus, Trash2, Pencil, X } from "lucide-react";
 import ManagerOnly from "@/components/ManagerOnly";
@@ -169,6 +169,26 @@ function AcademicPage() {
     finally { setEnvoi(false); }
   };
 
+  const handleSupprimerCycle = async (c) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le cycle "${c.libelle}" ?`)) return;
+    setEnvoi(true); setError("");
+    try {
+      await deleteCycle(c.idCycle);
+      await charger();
+    } catch (err) { setError(err.message || "Échec de la suppression."); }
+    finally { setEnvoi(false); }
+  };
+
+  const handleSupprimerCours = async (c) => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer le cours "${c.libelle}" ?`)) return;
+    setEnvoi(true); setError("");
+    try {
+      await deleteCours(c.idCours);
+      await charger();
+    } catch (err) { setError(err.message || "Échec de la suppression."); }
+    finally { setEnvoi(false); }
+  };
+
   const handleSupprimerClasse = async (c) => {
     if (!window.confirm(`Voulez-vous vraiment supprimer la classe "${c.libelle}" ?`)) return;
     setEnvoi(true); setError("");
@@ -226,7 +246,14 @@ function AcademicPage() {
                     <tr key={c.idCycle}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.description && c.description !== "INDEFINI" ? c.description : "—"}</td>
-                      <td style={{ ...tdStyle, textAlign: "right" }}><BtnEdit onClick={() => ouvrirEdit("cycle", c)} /></td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                          <BtnEdit onClick={() => ouvrirEdit("cycle", c)} />
+                          <button onClick={() => handleSupprimerCycle(c)} disabled={envoi} title="Supprimer le cycle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            <Trash2 size={14} /> Supprimer
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>
@@ -262,7 +289,14 @@ function AcademicPage() {
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.classe?.libelle || "—"}</td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.coefficient}</td>
-                      <td style={{ ...tdStyle, textAlign: "right" }}><BtnEdit onClick={() => ouvrirEdit("cours", c)} /></td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                          <BtnEdit onClick={() => ouvrirEdit("cours", c)} />
+                          <button onClick={() => handleSupprimerCours(c)} disabled={envoi} title="Supprimer le cours" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                            <Trash2 size={14} /> Supprimer
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
               </tbody>

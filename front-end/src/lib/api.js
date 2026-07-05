@@ -156,6 +156,7 @@ export const createCycle = (data) =>
   apiFetch("/classes/cycles", { method: "POST", body: JSON.stringify(data) });
 export const updateCycle = (id, data) =>
   apiFetch(`/classes/cycles/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteCycle = (id) => apiFetch(`/classes/cycles/${id}`, { method: "DELETE" });
 export const createClasse = (data) =>
   apiFetch("/classes", { method: "POST", body: JSON.stringify(data) });
 export const updateClasse = (id, data) =>
@@ -170,6 +171,7 @@ export const createCours = (data) =>
   apiFetch("/cours", { method: "POST", body: JSON.stringify(data) });
 export const updateCours = (id, data) =>
   apiFetch(`/cours/${id}`, { method: "PUT", body: JSON.stringify(data) });
+export const deleteCours = (id) => apiFetch(`/cours/${id}`, { method: "DELETE" });
 
 export const getVilles = () => apiFetch("/villes");
 export const seedVilles = () => apiFetch("/villes/seed", { method: "POST" });
