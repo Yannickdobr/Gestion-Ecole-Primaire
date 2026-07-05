@@ -193,7 +193,9 @@ export class EvaluationsController {
   @Roles(...DIRECTION, Role.ENSEIGNANT)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un bulletin de notes' })
-  createRapport(@Body() dto: CreateRapportDto) { return this.evaluationsService.createRapport(dto); }
+  createRapport(@Request() req, @Body() dto: CreateRapportDto) {
+    return this.evaluationsService.createRapport(dto, req.user);
+  }
 
   @Get('rapports/eleve/:matricule')
   @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE, Role.PARENT)

@@ -460,27 +460,30 @@ export class EvaluationsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   // ✅ CORRECTION BD : Rapport.idAca est FK vers AnneeAcademique (pas Trimestre)
-  async createRapport(dto: CreateRapportDto): Promise<Rapport> {
+  async createRapport(
+    dto: CreateRapportDto,
+    acteur?: { id: number; role: string },
+  ): Promise<Rapport> {
     const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule } });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${dto.matricule})`);
 
     const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${dto.idAca})`);
 
-    const rapport = this.rapportRepository.create({
-      libelle: dto.libelle,
-      // points / commentaire / event_date sont NOT NULL en BD : défauts côté service
-      points: dto.points ?? 0,
-      commentaire: dto.commentaire ?? 'RAS',
-      event_date: dto.event_date ? new Date(dto.event_date) : new Date(),
-      eleve,
-      anneeAcademique: annee, // ✅ FK vers AnneeAcademique comme dans la BD
-    });
-
-    // redacteur (idPers) est NOT NULL : compte courant, repli sur une personne par défaut
+    // Auteur : redacteur (idPers) est NOT NULL.
+    // - Si l'acteur est une Personne (enseignant/scolarité…) -> il est l'auteur réel.
+    // - Si c'est un Admin (direction, pas une Personne) -> on préfixe le commentaire
+    //   par "[Par <nom>]" et on retombe sur une personne par défaut pour la FK.
     let redacteur: Personne | null = null;
-    if (dto.idPers) {
+    let prefixe = '';
+    if (acteur?.role === 'personne') {
+      redacteur = await this.personneRepository.findOne({ where: { idPers: acteur.id } });
+    } else if (dto.idPers && acteur?.role !== 'admin') {
       redacteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+    }
+    if (!redacteur && acteur?.role === 'admin') {
+      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id } });
+      if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
     }
     if (!redacteur) {
       redacteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
@@ -488,6 +491,16 @@ export class EvaluationsService {
     if (!redacteur) {
       throw new NotFoundException('Aucune personne en base pour signer le rapport.');
     }
+
+    const rapport = this.rapportRepository.create({
+      libelle: dto.libelle,
+      // points / commentaire / event_date sont NOT NULL en BD : défauts côté service
+      points: dto.points ?? 0,
+      commentaire: (prefixe + (dto.commentaire ?? '')).trim() || 'RAS',
+      event_date: dto.event_date ? new Date(dto.event_date) : new Date(),
+      eleve,
+      anneeAcademique: annee, // ✅ FK vers AnneeAcademique comme dans la BD
+    });
     rapport.redacteur = redacteur;
     const saved = await this.rapportRepository.save(rapport);
 

@@ -62,9 +62,19 @@ export class PaiementsService {
    * Parcourt les élèves actifs, calcule leur arriéré pour l'année et notifie
    * (in-app + email) les parents de ceux ayant un solde dû.
    */
-  async envoyerRappelsImpayes(idAca: number, expediteurId?: number) {
+  async envoyerRappelsImpayes(idAca: number, acteur?: { id: number; role: string }) {
     const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${idAca})`);
+
+    // Auteur : Personne -> expéditeur réel ; Admin -> signature "[Par <nom>]".
+    let expediteurId: number | undefined;
+    let prefixe = '';
+    if (acteur?.role === 'personne') {
+      expediteurId = acteur.id;
+    } else if (acteur?.role === 'admin') {
+      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id } });
+      if (adm?.nom) prefixe = `[Par ${adm.nom}]`;
+    }
 
     const eleves = await this.eleveRepository.find({ where: { actif: 1 } });
     let elevesEnRetard = 0;
@@ -85,7 +95,8 @@ export class PaiementsService {
         'Rappel : scolarité en attente',
         `Bonjour,\nNous vous rappelons qu'un solde de scolarité de ${montant} FCFA reste dû pour votre enfant ` +
           `(matricule ${el.matricule}) au titre de l'année ${annee.libelle}.\n` +
-          `Merci de bien vouloir régulariser la situation auprès de la scolarité.`,
+          `Merci de bien vouloir régulariser la situation auprès de la scolarité.` +
+          (prefixe ? `\n\n${prefixe}` : ''),
         { expediteurId, annee: annee.libelle, type: 2 },
       );
       if (res.inApp > 0 || res.emails > 0) {

@@ -111,8 +111,7 @@ export class PaiementsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'BF-23 : envoyer les rappels d\'impayés aux parents (année académique)' })
   envoyerRappelsImpayes(@Request() req, @Param('idAca', ParseIntPipe) idAca: number) {
-    const expediteurId = req.user?.role === 'personne' ? req.user.id : undefined;
-    return this.paiementsService.envoyerRappelsImpayes(idAca, expediteurId);
+    return this.paiementsService.envoyerRappelsImpayes(idAca, req.user);
   }
 
   @Get('eleve/:matricule')
