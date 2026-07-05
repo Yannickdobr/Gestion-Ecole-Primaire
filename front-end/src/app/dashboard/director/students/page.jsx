@@ -481,11 +481,11 @@ export default function StudentsPage() {
       {modalOuvert && (
         <div
           onClick={() => !envoi && setModalOuvert(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px", zIndex: 1000, overflowY: "auto" }}
         >
           <div
             onClick={(ev) => ev.stopPropagation()}
-            style={{ width: "100%", maxWidth: 560, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)", maxHeight: "90vh", overflowY: "auto" }}
+            style={{ width: "100%", maxWidth: 560, margin: "auto", background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>
@@ -497,7 +497,7 @@ export default function StudentsPage() {
             </div>
 
             <form onSubmit={soumettre}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Nom *</label>
                   <input style={inputStyle} value={form.nom} onChange={(e) => majForm("nom", e.target.value)} />
