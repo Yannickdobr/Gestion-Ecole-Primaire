@@ -110,6 +110,7 @@ export default function FicheElevePage() {
           <Ligne label="Lieu de naissance" val={propre(eleve.lieuNaissance)} />
           <Ligne label="Ville" val={propre(eleve.villeNaissance?.libelle)} />
           <Ligne label="Langue" val={propre(eleve.langue)} />
+          <Ligne label="Groupe sanguin" val={eleve.groupeSanguin || "—"} />
           <Ligne label="Classe actuelle" val={affectationCourante ? `${affectationCourante.salle?.classe?.libelle || "—"} · Salle ${affectationCourante.salle?.libelle || "—"}` : "Non affecté"} />
           <Ligne label="Année" val={propre(affectationCourante?.anneeAcademique?.libelle)} />
         </div>

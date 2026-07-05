@@ -46,6 +46,7 @@ import {
         sexe: dto.sexe,
         langue: dto.langue ?? 'INDEFINI',
         photoURL: dto.photoURL ?? 'INDEFINI',
+        groupeSanguin: dto.groupeSanguin?.trim() || null,
         actif: 1,
       });
   
@@ -125,6 +126,7 @@ import {
       if (dto.sexe !== undefined) eleve.sexe = dto.sexe;
       if (dto.langue !== undefined) eleve.langue = dto.langue;
       if (dto.photoURL !== undefined) eleve.photoURL = dto.photoURL;
+      if (dto.groupeSanguin !== undefined) eleve.groupeSanguin = dto.groupeSanguin?.trim() || null;
       if (dto.actif !== undefined) eleve.actif = dto.actif;
   
       // Mise à jour ville de naissance

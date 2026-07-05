@@ -36,7 +36,8 @@ const tdStyle = { padding: "16px 24px", fontSize: 14, color: "var(--text-dark)",
 const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 6 };
 
-const FORM_VIDE = { nom: "", prenom: "", dateNaissance: "", sexe: "1", lieuNaissance: "", langue: "", idVilleNaissance: "", idSalle: "", idAca: "", photoURL: "" };
+const FORM_VIDE = { nom: "", prenom: "", dateNaissance: "", sexe: "1", lieuNaissance: "", langue: "", groupeSanguin: "", idVilleNaissance: "", idSalle: "", idAca: "", photoURL: "" };
+const GROUPES_SANGUINS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const PARENT_VIDE = { nom: "", prenom: "", username: "", mobile: "" };
 
 function formatDate(d) {
@@ -159,6 +160,7 @@ export default function StudentsPage() {
     };
     if (form.lieuNaissance.trim()) payload.lieuNaissance = form.lieuNaissance.trim();
     if (form.langue.trim()) payload.langue = form.langue.trim();
+    if (form.groupeSanguin) payload.groupeSanguin = form.groupeSanguin;
     if (form.idVilleNaissance) payload.idVilleNaissance = Number(form.idVilleNaissance);
     if (form.photoURL) payload.photoURL = form.photoURL;
     // L'élève est rattaché à l'admin connecté
@@ -548,6 +550,13 @@ export default function StudentsPage() {
                 <div>
                   <label style={labelStyle}>Langue</label>
                   <input style={inputStyle} value={form.langue} onChange={(e) => majForm("langue", e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Groupe sanguin</label>
+                  <select style={inputStyle} value={form.groupeSanguin} onChange={(e) => majForm("groupeSanguin", e.target.value)}>
+                    <option value="">— Non renseigné —</option>
+                    {GROUPES_SANGUINS.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label style={labelStyle}>Ville de naissance *</label>

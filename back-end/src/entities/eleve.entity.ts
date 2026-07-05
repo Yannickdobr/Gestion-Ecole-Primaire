@@ -45,6 +45,10 @@ export class Eleve {
   @Column({ type: 'varchar', length: 255, default: 'INDEFINI' })
   photoURL: string;
 
+  // Groupe sanguin (A+, O-, AB+…). Nullable : pas toujours renseigné.
+  @Column({ type: 'varchar', length: 5, nullable: true })
+  groupeSanguin: string | null;
+
   @Column({ type: 'smallint', default: 0 })
   actif: number; // 1=actif, 0=inactif
 

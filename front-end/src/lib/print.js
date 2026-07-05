@@ -102,6 +102,7 @@ export function imprimerCarte({ eleve, classe, annee }) {
         <div><b>Matricule :</b> #${esc(eleve?.matricule)}</div>
         <div><b>Classe :</b> ${esc(classe || "—")}</div>
         <div><b>Né(e) le :</b> ${fmtDate(eleve?.dateNaissance)}</div>
+        ${eleve?.groupeSanguin ? `<div><b>Groupe sanguin :</b> ${esc(eleve.groupeSanguin)}</div>` : ""}
       </div>
     </div>`;
   ouvrirImpression(`Carte_${eleve?.matricule || ""}`, corps);

@@ -44,7 +44,12 @@ import {
     @IsString()
     @MaxLength(255)
     photoURL?: string;
-  
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(5)
+    groupeSanguin?: string;
+
     @IsOptional()
     @IsInt()
     @Min(1)
@@ -92,7 +97,12 @@ import {
     @IsString()
     @MaxLength(255)
     photoURL?: string;
-  
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(5)
+    groupeSanguin?: string;
+
     @IsOptional()
     @IsInt()
     idVilleNaissance?: number;
