@@ -107,6 +107,21 @@ export function imprimerCarte({ eleve, classe, annee }) {
   ouvrirImpression(`Carte_${eleve?.matricule || ""}`, corps);
 }
 
+/** Emploi du temps (grille jours × heures). */
+export function imprimerEmploi({ titre, jours, heures, cellule }) {
+  const thJours = (jours || []).map((j) => `<th>${esc(j)}</th>`).join("");
+  const rows = (heures || []).map((h) => {
+    const tds = (jours || []).map((j) => `<td>${esc(cellule ? cellule(j, h) : "")}</td>`).join("");
+    return `<tr><td style="font-weight:700;white-space:nowrap">${esc(h)}</td>${tds}</tr>`;
+  }).join("");
+  const corps = `
+    <h1>Emploi du temps</h1>
+    <div class="meta">${esc(titre || "")}</div>
+    <table><thead><tr><th>Heure</th>${thJours}</tr></thead>
+      <tbody>${rows || '<tr><td>Aucun créneau.</td></tr>'}</tbody></table>`;
+  ouvrirImpression(`EDT_${esc(titre || "")}`, corps);
+}
+
 /** Certificat de scolarité pré-rempli. */
 export function imprimerAttestation({ eleve, classe, annee }) {
   const corps = `

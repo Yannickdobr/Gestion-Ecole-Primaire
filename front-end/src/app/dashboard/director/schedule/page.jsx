@@ -18,6 +18,8 @@ import {
   getClasses, getEnseignants, getSalles, getCours, getEmploi,
   createEmploi, deleteEmploi, verifierConflitsEmploi,
 } from '@/lib/api';
+import { imprimerEmploi } from '@/lib/print';
+import { exporterCSV } from '@/lib/export';
 
 // Créneaux horaires sélectionnables (hors pauses)
 const HEURES_CRENEAUX = ['08:00', '09:30', '11:15', '14:00', '15:30'];
@@ -51,6 +53,7 @@ const adaptClasses = (rows = []) =>
 const adaptEnseignants = (rows = []) =>
   rows.map((e, i) => ({
     idPers: e.personne?.idPers,
+    idClasse: e.classe?.idClasse, // pour filtrer l'EDT (un créneau ne stocke pas l'enseignant)
     nom: e.personne?.nom || '',
     prenom: e.personne?.prenom || '',
     initiales: initialesDe(e.personne?.prenom, e.personne?.nom),
@@ -680,14 +683,62 @@ export default function SchedulePage() {
     return [];
   }, [viewMode, classes, enseignants, salles]);
 
-  // Filtered schedule entries
+  // Filtered schedule entries.
+  // ⚠️ Un créneau ne stocke QUE la classe (ni enseignant ni salle) : pour les
+  // vues "enseignant" et "salle", on dérive la classe (enseignant→classe,
+  // salle→classe) puis on filtre les créneaux de cette classe.
   const filteredSlots = useMemo(() => {
-    if (!selectedFilter) return emploi;
-    if (viewMode === 'class') return emploi.filter(s => String(s.idClasse) === selectedFilter);
-    if (viewMode === 'teacher') return emploi.filter(s => String(s.idPers) === selectedFilter);
-    if (viewMode === 'room') return emploi.filter(s => String(s.idSalle) === selectedFilter);
-    return emploi;
-  }, [viewMode, selectedFilter, emploi]);
+    if (!selectedFilter) return []; // rien tant qu'aucune sélection
+    if (viewMode === 'class') {
+      return emploi.filter(s => String(s.idClasse) === selectedFilter);
+    }
+    if (viewMode === 'teacher') {
+      const ens = enseignants.find(e => String(e.idPers) === selectedFilter);
+      const idC = ens?.idClasse;
+      return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
+    }
+    if (viewMode === 'room') {
+      const salle = salles.find(s => String(s.idSalle) === selectedFilter);
+      const idC = salle?.idClasse;
+      return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
+    }
+    return [];
+  }, [viewMode, selectedFilter, emploi, enseignants, salles]);
+
+  const aucuneSelection = !selectedFilter;
+
+  const titreSelection = () => {
+    if (viewMode === 'class') return `Classe ${classes.find(c => String(c.idClasse) === selectedFilter)?.libelle || ''}`;
+    if (viewMode === 'teacher') { const e = enseignants.find(x => String(x.idPers) === selectedFilter); return e ? `Enseignant ${e.prenom} ${e.nom}` : ''; }
+    if (viewMode === 'room') return `Salle ${salles.find(s => String(s.idSalle) === selectedFilter)?.libelle || ''}`;
+    return '';
+  };
+
+  const handleImprimer = () => {
+    if (aucuneSelection) { setError("Sélectionnez d'abord une classe, un enseignant ou une salle."); return; }
+    imprimerEmploi({
+      titre: titreSelection(),
+      jours: JOURS,
+      heures: HEURES_CRENEAUX,
+      cellule: (jour, heure) => {
+        const s = filteredSlots.find(x => x.jour === jour && x.heure === heure);
+        return s ? (lookups.coursMap[s.idCours]?.libelle || 'Cours') : '';
+      },
+    });
+  };
+
+  const handleExporter = () => {
+    if (aucuneSelection) { setError("Sélectionnez d'abord une classe, un enseignant ou une salle."); return; }
+    const rows = filteredSlots.slice().sort(
+      (a, b) => (JOURS.indexOf(a.jour) - JOURS.indexOf(b.jour)) || (timeToMins(a.heure) - timeToMins(b.heure)),
+    );
+    exporterCSV(rows, [
+      { label: 'Jour', get: (r) => r.jour },
+      { label: 'Heure', get: (r) => r.heure },
+      { label: 'Cours', get: (r) => lookups.coursMap[r.idCours]?.libelle || '' },
+      { label: 'Classe', get: (r) => lookups.classeMap[r.idClasse]?.libelle || '' },
+    ], 'emploi_du_temps.csv');
+  };
 
   // Weekly stats
   const weeklyHours = Math.round(filteredSlots.reduce((acc, s) => acc + (s.duree / 60), 0) * 10) / 10;
@@ -762,19 +813,19 @@ export default function SchedulePage() {
               <FiPlus /> <span style={{ display: isMobile ? 'none' : 'inline' }}>Ajouter un créneau</span>
             </button>
             {[
-              { icon: <FiPrinter />, label: t.sched_print },
-              { icon: <FiDownload />, label: t.sched_export },
+              { icon: <FiPrinter />, label: t.sched_print, onClick: handleImprimer },
+              { icon: <FiDownload />, label: t.sched_export, onClick: handleExporter },
             ].map(btn => (
-              <button key={btn.label} title={btn.label} style={{
+              <button key={btn.label} title={btn.label} onClick={btn.onClick} disabled={aucuneSelection} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 12px', borderRadius: 9,
                 border: '1.5px solid rgba(26,18,8,0.1)',
-                background: '#faf9f7', color: '#4a3728',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: '#faf9f7', color: aucuneSelection ? '#c4b8b0' : '#4a3728',
+                fontSize: 12, fontWeight: 600, cursor: aucuneSelection ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit', transition: 'all 0.2s',
               }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#d86310'; e.currentTarget.style.color = '#d86310'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(26,18,8,0.1)'; e.currentTarget.style.color = '#4a3728'; }}
+                onMouseEnter={e => { if (aucuneSelection) return; e.currentTarget.style.borderColor = '#d86310'; e.currentTarget.style.color = '#d86310'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(26,18,8,0.1)'; e.currentTarget.style.color = aucuneSelection ? '#c4b8b0' : '#4a3728'; }}
               >
                 {btn.icon} <span style={{ display: isMobile ? 'none' : 'inline' }}>{btn.label}</span>
               </button>
@@ -873,35 +924,53 @@ export default function SchedulePage() {
 
       {/* ── GRID / MOBILE VIEW ────────────────────── */}
       <div style={{ padding: '14px 28px 32px' }}>
-        {/* Desktop */}
-        <div style={{ display: isMobile ? 'none' : 'block' }}>
+        {aucuneSelection ? (
           <div style={{
-            background: '#fff', borderRadius: 20, padding: '20px',
-            border: '1px solid rgba(26,18,8,0.07)',
-            boxShadow: '0 4px 20px rgba(26,18,8,0.06)',
+            background: '#fff', borderRadius: 20, padding: '48px 24px',
+            border: '1px solid rgba(26,18,8,0.07)', boxShadow: '0 4px 20px rgba(26,18,8,0.06)',
+            textAlign: 'center', color: '#8a7060',
           }}>
-            <DesktopGrid filteredSlots={filteredSlots} viewMode={viewMode} t={t} lookups={lookups} onDelete={supprimerCreneau} />
+            <BsCalendar3 style={{ fontSize: 34, opacity: 0.4, marginBottom: 10 }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#4a3728' }}>
+              Choisissez {viewMode === 'class' ? 'une classe' : viewMode === 'teacher' ? 'un enseignant' : 'une salle'} pour afficher l'emploi du temps
+            </div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>
+              Sélectionnez le mode (classe / enseignant / salle) puis l'élément voulu dans la liste ci-dessus.
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Desktop */}
+            <div style={{ display: isMobile ? 'none' : 'block' }}>
+              <div style={{
+                background: '#fff', borderRadius: 20, padding: '20px',
+                border: '1px solid rgba(26,18,8,0.07)',
+                boxShadow: '0 4px 20px rgba(26,18,8,0.06)',
+              }}>
+                <DesktopGrid filteredSlots={filteredSlots} viewMode={viewMode} t={t} lookups={lookups} onDelete={supprimerCreneau} />
+              </div>
+            </div>
 
-        {/* Mobile */}
-        <div style={{ display: isMobile ? 'block' : 'none' }}>
-          <div style={{
-            background: '#fff', borderRadius: 20, padding: '16px',
-            border: '1px solid rgba(26,18,8,0.07)',
-            boxShadow: '0 4px 20px rgba(26,18,8,0.06)',
-          }}>
-            <MobileView
-              filteredSlots={filteredSlots}
-              selectedDay={selectedDay}
-              setSelectedDay={setSelectedDay}
-              viewMode={viewMode}
-              t={t}
-              lookups={lookups}
-              onDelete={supprimerCreneau}
-            />
-          </div>
-        </div>
+            {/* Mobile */}
+            <div style={{ display: isMobile ? 'block' : 'none' }}>
+              <div style={{
+                background: '#fff', borderRadius: 20, padding: '16px',
+                border: '1px solid rgba(26,18,8,0.07)',
+                boxShadow: '0 4px 20px rgba(26,18,8,0.06)',
+              }}>
+                <MobileView
+                  filteredSlots={filteredSlots}
+                  selectedDay={selectedDay}
+                  setSelectedDay={setSelectedDay}
+                  viewMode={viewMode}
+                  t={t}
+                  lookups={lookups}
+                  onDelete={supprimerCreneau}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Modal : ajouter un créneau ── */}
