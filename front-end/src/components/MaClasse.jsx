@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   getTitulaires, getFrequenteBySalle, getNotesEleve, getAnnees,
-  getRapportsEleve, createRapport,
+  getRapportsEleve, createRapport, getJustificatifs,
 } from "@/lib/api";
-import { Users2, BookOpen, ChevronDown, ClipboardList, Plus } from "lucide-react";
+import { Users2, BookOpen, ChevronDown, ClipboardList, Plus, CheckCircle2 } from "lucide-react";
 
 const thStyle = { padding: "12px 20px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
 const tdStyle = { padding: "12px 20px", fontSize: 14, color: "var(--text-dark)", borderBottom: "1px solid var(--surface-border)" };
@@ -39,6 +39,15 @@ export default function MaClasse() {
   const [moyennes, setMoyennes] = useState({}); // { matricule: number|null }
   const [open, setOpen] = useState(null);       // matricule déplié
   const [panel, setPanel] = useState("notes");  // 'notes' | 'suivi'
+  const [justifies, setJustifies] = useState(new Set()); // idRapport ayant un justificatif VALIDÉ
+
+  useEffect(() => {
+    getJustificatifs().then((js) => {
+      const set = new Set();
+      (Array.isArray(js) ? js : []).forEach((j) => { if (j.idDirecteur) set.add(Number(j.idRapport)); });
+      setJustifies(set);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let actif = true;
@@ -132,7 +141,7 @@ export default function MaClasse() {
                 open={open === e.matricule} panel={panel}
                 onNotes={() => basculer(e.matricule, "notes")}
                 onSuivi={() => basculer(e.matricule, "suivi")}
-                idAca={idAca} idPers={user?.id}
+                idAca={idAca} idPers={user?.id} justifies={justifies}
               />
             ))}
           </tbody>
@@ -142,7 +151,7 @@ export default function MaClasse() {
   );
 }
 
-function FragmentRow({ e, moyenne, notes, open, panel, onNotes, onSuivi, idAca, idPers }) {
+function FragmentRow({ e, moyenne, notes, open, panel, onNotes, onSuivi, idAca, idPers, justifies }) {
   return (
     <>
       <tr>
@@ -166,7 +175,7 @@ function FragmentRow({ e, moyenne, notes, open, panel, onNotes, onSuivi, idAca, 
           <td colSpan={5} style={{ padding: "0 20px 16px", background: "#faf8f5" }}>
             {panel === "notes"
               ? <PanneauNotes notes={notes} />
-              : <PanneauSuivi matricule={e.matricule} idAca={idAca} idPers={idPers} />}
+              : <PanneauSuivi matricule={e.matricule} idAca={idAca} idPers={idPers} justifies={justifies} />}
           </td>
         </tr>
       )}
@@ -188,7 +197,7 @@ function PanneauNotes({ notes }) {
   );
 }
 
-function PanneauSuivi({ matricule, idAca, idPers }) {
+function PanneauSuivi({ matricule, idAca, idPers, justifies }) {
   const [rapports, setRapports] = useState(null);
   const [form, setForm] = useState({ libelle: "Absence", points: "", commentaire: "", event_date: new Date().toISOString().slice(0, 10) });
   const [envoi, setEnvoi] = useState(false);
@@ -240,6 +249,7 @@ function PanneauSuivi({ matricule, idAca, idPers }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-dark)" }}>{r.libelle}</span>
                     {Number(r.points) > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 999, background: "rgba(216,99,16,0.12)", color: "var(--orange)" }}>{r.points} pt(s)</span>}
+                    {justifies && justifies.has(Number(r.idRap)) && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10.5, fontWeight: 600, padding: "1px 7px", borderRadius: 999, background: "rgba(22,163,74,0.12)", color: "#16a34a" }}><CheckCircle2 size={11} /> Justifié</span>}
                     <span style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: "auto" }}>{r.event_date ? new Date(r.event_date).toLocaleDateString("fr-FR") : ""}</span>
                   </div>
                   {r.commentaire && r.commentaire !== "RAS" && <div style={{ fontSize: 12.5, color: "#6b5544", marginTop: 3 }}>{r.commentaire}</div>}
