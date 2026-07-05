@@ -130,7 +130,8 @@ import {
   
     async findAllClasses(): Promise<Classe[]> {
       return this.classeRepository.find({
-        relations: ['cycle'],
+        // 'salles' est nécessaire côté front (bilan par classe, bulletins, délibération)
+        relations: ['cycle', 'salles'],
         order: { libelle: 'ASC' },
       });
     }
