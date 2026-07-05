@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
-import { getEleves, getAnnees, getRapportsEleve, createRapport } from "@/lib/api";
-import { ShieldAlert, Plus } from "lucide-react";
+import { getEleves, getAnnees, getRapportsEleve, createRapport, getJustificatifs } from "@/lib/api";
+import { ShieldAlert, Plus, CheckCircle2 } from "lucide-react";
 
 const inputStyle = { width: "100%", padding: "10px 13px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 5 };
@@ -17,9 +17,19 @@ export default function DisciplinePage() {
   const [matricule, setMatricule] = useState("");
   const [idAca, setIdAca] = useState(null);
   const [rapports, setRapports] = useState(null);
+  const [justifies, setJustifies] = useState(new Set()); // idRapport ayant un justificatif VALIDÉ
   const [form, setForm] = useState({ libelle: "Avertissement", points: "", commentaire: "", event_date: new Date().toISOString().slice(0, 10) });
   const [envoi, setEnvoi] = useState(false);
   const [error, setError] = useState("");
+
+  const chargerJustifies = async () => {
+    try {
+      const js = await getJustificatifs();
+      const set = new Set();
+      (Array.isArray(js) ? js : []).forEach((j) => { if (j.idDirecteur) set.add(Number(j.idRapport)); });
+      setJustifies(set);
+    } catch { /* pas bloquant */ }
+  };
 
   useEffect(() => {
     getEleves().then((e) => setEleves(Array.isArray(e) ? e : [])).catch(() => setEleves([]));
@@ -27,6 +37,7 @@ export default function DisciplinePage() {
       const recente = (Array.isArray(a) ? a : []).reduce((acc, x) => (!acc || Number(x.idAnnee) > Number(acc.idAnnee) ? x : acc), null);
       setIdAca(recente?.idAnnee ?? null);
     }).catch(() => {});
+    chargerJustifies();
   }, []);
 
   const charger = async (mat) => {
@@ -34,6 +45,7 @@ export default function DisciplinePage() {
     if (!mat) return;
     try { const r = await getRapportsEleve(mat); setRapports(Array.isArray(r) ? r : []); }
     catch { setRapports([]); }
+    chargerJustifies();
   };
 
   const ajouter = async (e) => {
@@ -92,6 +104,7 @@ export default function DisciplinePage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ fontSize: 14, fontWeight: 700 }}>{r.libelle}</span>
                         {Number(r.points) > 0 && <span style={{ fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 999, background: "rgba(216,99,16,0.12)", color: "var(--orange)" }}>{r.points} pt(s)</span>}
+                        {justifies.has(Number(r.idRap)) && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 999, background: "rgba(22,163,74,0.12)", color: "#16a34a" }}><CheckCircle2 size={12} /> Justifié</span>}
                         <span style={{ fontSize: 11.5, color: "var(--muted)", marginLeft: "auto" }}>{r.event_date ? new Date(r.event_date).toLocaleDateString("fr-FR") : ""}</span>
                       </div>
                       {r.commentaire && r.commentaire !== "RAS" && <div style={{ fontSize: 12.5, color: "#6b5544", marginTop: 3 }}>{r.commentaire}</div>}
