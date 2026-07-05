@@ -1052,7 +1052,10 @@ h3 {
   to { opacity: 1; transform: translateY(0); }
 }
 main > * {
-  animation: fade-rise 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+  /* 'backwards' (et non 'both') : garde l'animation d'entrée SANS conserver de
+     transform après coup. Un transform persistant créerait un bloc conteneur
+     qui rognerait les modals en position:fixed (superposition coupée). */
+  animation: fade-rise 0.32s cubic-bezier(0.4, 0, 0.2, 1) backwards;
 }
 
 /* Respect de prefers-reduced-motion */
