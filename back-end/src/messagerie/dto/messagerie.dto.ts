@@ -84,3 +84,19 @@ export class EnvoiMasseDto {
   @IsNotEmpty()
   idParents: number[];
 }
+
+export class ConvocationClasseDto {
+  @IsString()
+  @IsNotEmpty({ message: "L'objet est obligatoire" })
+  @MaxLength(255)
+  objet: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Le contenu est obligatoire' })
+  information: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(15)
+  AnneeAcade?: string;
+}

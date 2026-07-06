@@ -8,6 +8,8 @@ import { Personne } from '../entities/personne.entity';
 import { Parents } from '../entities/parents.entity';
 import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/messagerie.dto';
 import { MailService } from '../mail/mail.service';
+import { Frequente } from '../entities/frequente.entity';
+import { Admin } from '../entities/admin.entity';
 
 @Injectable()
 export class MessagerieService {
@@ -88,6 +90,65 @@ export class MessagerieService {
       }
     }
     return { envoyes, erreurs };
+  }
+
+  /**
+   * Réunion parent-titulaire : convoque en une fois TOUS les parents des élèves
+   * d'une salle (classe). Réutilise la messagerie (in-app + email). Sans modif BD.
+   * Auteur : la Personne connectée (titulaire/scolarité) ; si Admin -> signature "[Par <nom>]".
+   */
+  async convoquerParentsClasse(
+    idSalle: number,
+    dto: { objet: string; information: string; AnneeAcade?: string },
+    acteur: { id: number; role: string },
+  ): Promise<{ envoyes: number; parents: number }> {
+    const manager = this.parentsRepository.manager;
+
+    // Expéditeur (Personne, NOT NULL) + éventuelle signature admin.
+    let expediteur: Personne | null = null;
+    let prefixe = '';
+    if (acteur?.role === 'personne') {
+      expediteur = await this.personneRepository.findOne({ where: { idPers: acteur.id } });
+    }
+    if (!expediteur && acteur?.role === 'admin') {
+      const adm = await manager.findOne(Admin, { where: { ID: acteur.id } });
+      if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
+    }
+    if (!expediteur) {
+      expediteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+    }
+    if (!expediteur) throw new NotFoundException('Aucune personne en base pour signer la convocation.');
+
+    // Élèves de la salle -> leurs parents (dédupliqués).
+    const freqs = await manager.find(Frequente, { where: { salle: { idSalle } }, relations: ['eleve'] });
+    const matricules = [...new Set(freqs.map((f) => f.eleve?.matricule).filter(Boolean))];
+    if (matricules.length === 0) return { envoyes: 0, parents: 0 };
+
+    const liens = await this.parentsRepository.find({
+      where: { eleve: { matricule: In(matricules) } },
+      relations: ['personne', 'eleve'],
+    });
+
+    const information = prefixe + dto.information;
+    let envoyes = 0;
+    for (const lien of liens) {
+      const message = this.messagesRepository.create({
+        objet: dto.objet,
+        information,
+        type_message: 1, // tous les parents
+        AnneeAcade: dto.AnneeAcade ?? '',
+        valider: 1,
+        expediteur,
+        destinataire: lien,
+      });
+      await this.messagesRepository.save(message);
+      envoyes++;
+      const email = lien.personne?.username;
+      if (email) {
+        this.mail.envoyer({ to: email, sujet: dto.objet, texte: information }).catch(() => undefined);
+      }
+    }
+    return { envoyes, parents: liens.length };
   }
 
   async findAll(): Promise<Messages[]> {

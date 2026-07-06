@@ -3,11 +3,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { MessagerieService } from './messagerie.service';
-import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/messagerie.dto';
+import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto, ConvocationClasseDto } from './dto/messagerie.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { DIRECTION } from '../auth/roles.enum';
+import { Role, DIRECTION } from '../auth/roles.enum';
 
 @ApiTags('Messagerie')
 @ApiBearerAuth('JWT-auth')
@@ -67,6 +67,18 @@ export class MessagerieController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Envoyer le même message à plusieurs parents en une fois' })
   envoyerEnMasse(@Request() req, @Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto, req.user); }
+
+  @Post('convocation-classe/:idSalle')
+  @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Convoquer tous les parents des élèves d\'une classe (réunion parent-titulaire)' })
+  convoquerParentsClasse(
+    @Request() req,
+    @Param('idSalle', ParseIntPipe) idSalle: number,
+    @Body() dto: ConvocationClasseDto,
+  ) {
+    return this.messagerieService.convoquerParentsClasse(idSalle, dto, req.user);
+  }
 
   @Put(':id')
   @ApiOperation({ summary: 'Modifier un brouillon (impossible si déjà envoyé)' })

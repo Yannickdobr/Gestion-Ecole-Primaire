@@ -247,6 +247,9 @@ export const envoyerMessage = (data) =>
   apiFetch("/messagerie", { method: "POST", body: JSON.stringify(data) });
 export const envoyerMessageMasse = (data) =>
   apiFetch("/messagerie/masse", { method: "POST", body: JSON.stringify(data) });
+/** Réunion parent-titulaire : convoque tous les parents des élèves d'une salle. */
+export const convoquerParentsClasse = (idSalle, data) =>
+  apiFetch(`/messagerie/convocation-classe/${idSalle}`, { method: "POST", body: JSON.stringify(data) });
 export const validerMessage = (id) =>
   apiFetch(`/messagerie/${id}/valider`, { method: "PATCH" });
 export const modifierMessage = (id, data) =>
