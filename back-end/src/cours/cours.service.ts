@@ -68,6 +68,12 @@ export class CoursService {
       classe,
     });
 
+    if (dto.idLivre) {
+      const livre = await this.livresRepository.findOne({ where: { idLivre: dto.idLivre } });
+      if (!livre) throw new NotFoundException(`Livre introuvable (id: ${dto.idLivre})`);
+      cours.livre = livre;
+    }
+
     if (dto.idAdmin) {
       const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
       if (admin) cours.admin = admin;
@@ -113,6 +119,16 @@ export class CoursService {
       const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
       if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
       cours.classe = classe;
+    }
+
+    if (dto.idLivre !== undefined) {
+      if (dto.idLivre === null) {
+        cours.livre = null;
+      } else {
+        const livre = await this.livresRepository.findOne({ where: { idLivre: dto.idLivre } });
+        if (!livre) throw new NotFoundException(`Livre introuvable (id: ${dto.idLivre})`);
+        cours.livre = livre;
+      }
     }
 
     return this.coursRepository.save(cours);

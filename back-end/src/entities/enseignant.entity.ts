@@ -5,7 +5,6 @@ import {
 import { Personne } from './personne.entity';
 import { Admin } from './admin.entity';
 import { Cours } from './cours.entity';
-import { Classe } from './classe.entity';
 
 @Entity('enseignant')
 export class Enseignant {
@@ -23,12 +22,10 @@ export class Enseignant {
   @JoinColumn({ name: 'idPers' })
   personne: Personne;
 
-  // Classe gérée par l'enseignant (il y donne toutes les matières sauf la
-  // matière de difficulté ci-dessous). L'affichage « Classe X · Salle Y »
-  // dérive la salle via classe.salles côté requêtes.
-  @ManyToOne(() => Classe, { eager: true, nullable: true })
-  @JoinColumn({ name: 'idClasse' })
-  classe: Classe;
+  // NB : l'enseignant n'a PAS de classe propre. Sa classe se déduit du
+  // titulariat (Titulaire.idPers -> Salle -> Classe). Seuls les enseignants
+  // sont titulaires ; on crée l'enseignant sans classe puis on l'affecte via
+  // Titulaire.
 
   // Matière de DIFFICULTÉ (le cours qu'il NE donne PAS) — optionnel
   @ManyToOne(() => Cours, { eager: true, nullable: true })

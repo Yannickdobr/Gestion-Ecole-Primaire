@@ -168,17 +168,18 @@ import {
     async removeClasse(idClasse: number): Promise<{ message: string }> {
       const classe = await this.findClasseById(idClasse);
       const m = this.classeRepository.manager;
-      const [salles, cours, creneaux, enseignants] = await Promise.all([
+      // NB : l'enseignant n'est plus lié à une classe (la classe vient du
+      // titulariat via la salle) -> on ne compte plus les enseignants ici ;
+      // les salles couvrent déjà le blocage (titulaire -> salle -> classe).
+      const [salles, cours, creneaux] = await Promise.all([
         m.count(Salle, { where: { classe: { idClasse } } }),
         m.count(Cours, { where: { classe: { idClasse } } }),
         m.count(EmploiDuTemps, { where: { classe: { idClasse } } }),
-        m.count(Enseignant, { where: { classe: { idClasse } } }),
       ]);
       const liens: string[] = [];
       if (salles) liens.push(`${salles} salle(s)`);
       if (cours) liens.push(`${cours} cours`);
       if (creneaux) liens.push(`${creneaux} créneau(x) d'emploi du temps`);
-      if (enseignants) liens.push(`${enseignants} enseignant(s)`);
       if (liens.length) {
         throw new ConflictException(
           `Impossible de supprimer la classe "${classe.libelle}" : ${liens.join(', ')} y sont rattaché(s). Détachez-les d'abord.`,

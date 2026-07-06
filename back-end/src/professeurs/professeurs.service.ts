@@ -257,9 +257,7 @@ export class ProfesseursService {
       throw new ConflictException('Cette personne est déjà enregistrée comme enseignant');
     }
 
-    // Classe gérée (obligatoire) : l'enseignant y donne toutes les matières
-    const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
-    if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
+    // L'enseignant est créé SANS classe : sa classe vient du titulariat.
 
     // Matière de difficulté (cours qu'il ne donne pas) — optionnelle
     let cours: Cours | undefined = undefined;
@@ -271,7 +269,6 @@ export class ProfesseursService {
 
     const enseignant = this.enseignantRepository.create({
       personne,
-      classe,
       cours,
       actif: 1, // ✅ minuscule corrigé
     });
@@ -295,20 +292,16 @@ export class ProfesseursService {
    * La matière doit appartenir à la classe de l'enseignant.
    */
   async setMatiereDifficulte(idEnseignant: number, idCours: number | null): Promise<Enseignant> {
-    const ens = await this.enseignantRepository.findOne({
-      where: { idEnseignant },
-      relations: ['classe'],
-    });
+    const ens = await this.enseignantRepository.findOne({ where: { idEnseignant } });
     if (!ens) throw new NotFoundException(`Enseignant introuvable (id: ${idEnseignant})`);
 
     if (idCours == null) {
       ens.cours = null as any; // efface la matière de difficulté
     } else {
-      const cours = await this.coursRepository.findOne({ where: { idCours }, relations: ['classe'] });
+      const cours = await this.coursRepository.findOne({ where: { idCours } });
       if (!cours) throw new NotFoundException(`Cours introuvable (id: ${idCours})`);
-      if (ens.classe && cours.classe && Number(cours.classe.idClasse) !== Number(ens.classe.idClasse)) {
-        throw new ConflictException("La matière de difficulté doit appartenir à la classe de l'enseignant.");
-      }
+      // L'enseignant n'a plus de classe propre (elle vient du titulariat) :
+      // on accepte n'importe quel cours valide comme matière de difficulté.
       ens.cours = cours;
     }
     return this.enseignantRepository.save(ens);
@@ -319,7 +312,7 @@ export class ProfesseursService {
    */
   async findAllEnseignants(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
-      relations: ['personne', 'classe.salles'], // classe.salles → affichage « Classe X · Salle Y »
+      relations: ['personne'], // classe.salles → affichage « Classe X · Salle Y »
       order: { created_at: 'DESC' },
     });
   }
@@ -330,7 +323,7 @@ export class ProfesseursService {
   async findEnseignantsActifs(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
       where: { actif: 1 }, // ✅ minuscule corrigé
-      relations: ['personne', 'classe.salles'],
+      relations: ['personne'],
       order: { created_at: 'DESC' },
     });
   }
@@ -341,7 +334,7 @@ export class ProfesseursService {
   async findEnseignantById(idEnseignant: number): Promise<Enseignant> {
     const enseignant = await this.enseignantRepository.findOne({
       where: { idEnseignant },
-      relations: ['personne', 'classe.salles'],
+      relations: ['personne'],
     });
     if (!enseignant) {
       throw new NotFoundException(`Enseignant introuvable (id: ${idEnseignant})`);

@@ -38,6 +38,10 @@ export class CreateCoursDto {
 
   @IsOptional()
   @IsInt()
+  idLivre?: number;
+
+  @IsOptional()
+  @IsInt()
   idAdmin?: number;
 }
 
@@ -64,6 +68,10 @@ export class UpdateCoursDto {
   @IsOptional()
   @IsInt()
   idClasse?: number;
+
+  @IsOptional()
+  @IsInt()
+  idLivre?: number;
 
   @IsOptional()
   @IsInt()

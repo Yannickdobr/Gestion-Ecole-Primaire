@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
-import { getEnseignants, getAnnees, getFichesEnseignant, createFicheEnseignant, deleteFicheEnseignant, getCoursParClasse, setMatiereDifficulte } from "@/lib/api";
+import { getEnseignants, getAnnees, getFichesEnseignant, createFicheEnseignant, deleteFicheEnseignant, getCoursParClasse, setMatiereDifficulte, getTitulaires } from "@/lib/api";
 import { ClipboardList, Plus, Trash2, Repeat } from "lucide-react";
 
 const inputStyle = { width: "100%", padding: "10px 13px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
@@ -12,6 +12,7 @@ const TYPES = ["Évaluation", "Félicitation", "Avertissement", "Formation", "Ob
 
 export default function RhPage() {
   const [enseignants, setEnseignants] = useState([]);
+  const [titulaires, setTitulaires] = useState([]);
   const [idEnseignant, setIdEnseignant] = useState("");
   const [idAca, setIdAca] = useState(null);
   const [fiches, setFiches] = useState(null);
@@ -24,8 +25,16 @@ export default function RhPage() {
   const [difficulteSel, setDifficulteSel] = useState("");
   const [savingDiff, setSavingDiff] = useState(false);
 
+  // Classe d'un enseignant dérivée du titulariat (idPers -> salle -> classe)
+  const classeDeEns = (ens) => {
+    if (!ens) return null;
+    const t = titulaires.find((tt) => Number(tt.personne?.idPers) === Number(ens.personne?.idPers) && Number(tt.actif) === 1);
+    return t?.salle?.classe || null;
+  };
+
   useEffect(() => {
     getEnseignants().then((e) => setEnseignants(Array.isArray(e) ? e : [])).catch(() => setEnseignants([]));
+    getTitulaires().then((t) => setTitulaires(Array.isArray(t) ? t : [])).catch(() => setTitulaires([]));
     getAnnees().then((a) => {
       const recente = (Array.isArray(a) ? a : []).reduce((acc, x) => (!acc || Number(x.idAnnee) > Number(acc.idAnnee) ? x : acc), null);
       setIdAca(recente?.idAnnee ?? null);
@@ -42,8 +51,9 @@ export default function RhPage() {
     const ens = enseignants.find((e) => Number(e.idEnseignant) === Number(id));
     setEnsCourant(ens || null);
     setDifficulteSel(ens?.cours?.idCours ? String(ens.cours.idCours) : "");
-    if (ens?.classe?.idClasse) {
-      try { const cc = await getCoursParClasse(ens.classe.idClasse); setCoursClasse(Array.isArray(cc) ? cc : []); }
+    const classe = classeDeEns(ens);
+    if (classe?.idClasse) {
+      try { const cc = await getCoursParClasse(classe.idClasse); setCoursClasse(Array.isArray(cc) ? cc : []); }
       catch { setCoursClasse([]); }
     }
   };
@@ -104,7 +114,7 @@ export default function RhPage() {
           <option value="">— Sélectionner un enseignant —</option>
           {enseignants.map((en) => (
             <option key={en.idEnseignant} value={en.idEnseignant}>
-              {en.personne?.prenom} {en.personne?.nom}{en.classe ? ` · ${en.classe.libelle}` : ""}
+              {en.personne?.prenom} {en.personne?.nom}{classeDeEns(en) ? ` · ${classeDeEns(en).libelle}` : ""}
             </option>
           ))}
         </select>
@@ -115,7 +125,7 @@ export default function RhPage() {
       {idEnseignant && ensCourant && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 18, padding: 20, marginBottom: 22 }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}><Repeat size={16} style={{ color: "var(--orange)" }} /> Matière de difficulté (intérim)</h3>
-          <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>La matière que cet enseignant n'assure pas dans sa classe <b>{ensCourant.classe?.libelle || "—"}</b> — un intérimaire libre viendra la couvrir automatiquement (échange de créneau).</p>
+          <p style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>La matière que cet enseignant n'assure pas dans sa classe <b>{classeDeEns(ensCourant)?.libelle || "—"}</b> — un intérimaire libre viendra la couvrir automatiquement (échange de créneau).</p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ minWidth: 260 }}>
               <label style={labelStyle}>Matière (parmi les cours de sa classe)</label>

@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Admin } from './admin.entity';
 import { Classe } from './classe.entity';
+import { Livres } from './livres.entity';
 
 /**
  * Entité Cours – Matière ou discipline enseignée dans une classe
@@ -41,6 +42,11 @@ export class Cours {
   @ManyToOne(() => Classe, { eager: true, nullable: false })
   @JoinColumn({ name: 'idClasse' })
   classe: Classe;
+
+  // Livre associé au cours (FK idLivre). Nullable : pas toujours renseigné.
+  @ManyToOne(() => Livres, { eager: true, nullable: true })
+  @JoinColumn({ name: 'idLivre' })
+  livre: Livres | null;
 
   @ManyToOne(() => Admin, { nullable: false })
   @JoinColumn({ name: 'idAdmin' })

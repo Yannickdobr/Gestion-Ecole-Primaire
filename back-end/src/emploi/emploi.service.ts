@@ -11,6 +11,7 @@ import { Classe } from '../entities/classe.entity';
 import { Cours } from '../entities/cours.entity';
 import { Admin } from '../entities/admin.entity';
 import { Enseignant } from '../entities/enseignant.entity';
+import { Titulaire } from '../entities/titulaire.entity';
 import {
   CreateEmploiDuTempsDto,
   UpdateEmploiDuTempsDto,
@@ -52,16 +53,30 @@ export class EmploiService {
   // Tout est calculé à la volée à partir de l'emploi + de la table Enseignant.
   // ══════════════════════════════════════════════════════════════════════════
   async planInterim(): Promise<any[]> {
-    const [creneaux, enseignants] = await Promise.all([
+    const [creneaux, enseignants, titulaires] = await Promise.all([
       this.emploiRepository.find({ relations: ['classe', 'cours'] }),
-      this.enseignantRepository.find({ where: { actif: 1 }, relations: ['personne', 'classe', 'cours'] }),
+      this.enseignantRepository.find({ where: { actif: 1 }, relations: ['personne', 'cours'] }),
+      // La classe d'un enseignant vient du titulariat : idPers -> salle -> classe
+      this.enseignantRepository.manager.find(Titulaire, {
+        where: { actif: 1 },
+        relations: ['personne', 'salle', 'salle.classe'],
+      }),
     ]);
 
-    // classe → enseignant titulaire (1 enseignant polyvalent par classe)
+    // idPers -> idClasse (via le titulariat)
+    const classeParPers = new Map<number, number>();
+    for (const t of titulaires) {
+      const idp = t.personne?.idPers;
+      const idc = t.salle?.classe?.idClasse;
+      if (idp != null && idc != null) classeParPers.set(Number(idp), Number(idc));
+    }
+
+    // classe → enseignant (le titulaire de cette classe)
     const profParClasse = new Map<number, Enseignant>();
     for (const e of enseignants) {
-      const idc = e.classe?.idClasse;
-      if (idc != null && !profParClasse.has(Number(idc))) profParClasse.set(Number(idc), e);
+      const idp = e.personne?.idPers;
+      const idc = idp != null ? classeParPers.get(Number(idp)) : null;
+      if (idc != null && !profParClasse.has(idc)) profParClasse.set(idc, e);
     }
     const difficulteDe = (e?: Enseignant) => (e?.cours?.idCours != null ? Number(e.cours.idCours) : null);
     const info = (e?: Enseignant) => e ? { idEnseignant: e.idEnseignant, idPers: e.personne?.idPers, nom: e.personne?.nom, prenom: e.personne?.prenom } : null;

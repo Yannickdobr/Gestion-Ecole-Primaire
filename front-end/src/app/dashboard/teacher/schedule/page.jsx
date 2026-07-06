@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getEnseignants, getEmploi, getPlanInterim } from "@/lib/api";
+import { getEnseignants, getEmploi, getPlanInterim, getTitulaires } from "@/lib/api";
 import { CalendarDays, Repeat } from "lucide-react";
 
 const JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
@@ -17,6 +17,7 @@ function normHeure(h = "") {
 export default function TeacherSchedule() {
   const { user } = useAuth();
   const [enseignant, setEnseignant] = useState(null);
+  const [salle, setSalle] = useState(null); // salle du titulariat (-> classe)
   const [creneaux, setCreneaux] = useState([]);
   const [plan, setPlan] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,14 +27,21 @@ export default function TeacherSchedule() {
     let actif = true;
     (async () => {
       try {
-        const [ens, emp, pl] = await Promise.all([getEnseignants(), getEmploi(), getPlanInterim().catch(() => [])]);
+        const [ens, emp, pl, tits] = await Promise.all([
+          getEnseignants(), getEmploi(), getPlanInterim().catch(() => []), getTitulaires().catch(() => []),
+        ]);
         if (!actif) return;
         const mien = (Array.isArray(ens) ? ens : []).find(
           (e) => Number(e.personne?.idPers) === Number(user?.id),
         );
         setEnseignant(mien || null);
         setPlan(Array.isArray(pl) ? pl : []);
-        const idClasseEns = mien?.classe?.idClasse;
+        // La classe vient du titulariat : idPers -> salle -> classe
+        const monTit = (Array.isArray(tits) ? tits : []).find(
+          (t) => Number(t.personne?.idPers) === Number(user?.id) && Number(t.actif) === 1,
+        );
+        setSalle(monTit?.salle || null);
+        const idClasseEns = monTit?.salle?.classe?.idClasse;
         if (idClasseEns) {
           const list = (Array.isArray(emp) ? emp : []).filter(
             (c) => Number(c.classe?.idClasse) === Number(idClasseEns),
@@ -82,8 +90,8 @@ export default function TeacherSchedule() {
         <h1 style={{ fontSize: 30, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>Mon emploi du temps</h1>
       </div>
       <p style={{ color: "var(--muted)", marginBottom: 8 }}>
-        Classe <b>{enseignant.classe?.libelle || "—"}</b>
-        {(enseignant.classe?.salles || []).length > 0 ? <> · Salle <b>{enseignant.classe.salles.map((s) => s.libelle).join(" / ")}</b></> : null}
+        Classe <b>{salle?.classe?.libelle || "—"}</b>
+        {salle ? <> · Salle <b>{salle.libelle}</b></> : null}
         {" "}· vous assurez toutes les matières
         {idDifficulte ? <> sauf <b>{enseignant.cours?.libelle}</b> (matière de difficulté)</> : null}.
       </p>

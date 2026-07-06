@@ -16,7 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useActiveYear } from '@/context/ActiveYearContext';
 import {
   getClasses, getEnseignants, getSalles, getCours, getEmploi,
-  createEmploi, deleteEmploi, verifierConflitsEmploi,
+  createEmploi, deleteEmploi, verifierConflitsEmploi, getTitulaires,
 } from '@/lib/api';
 import { imprimerEmploi } from '@/lib/print';
 import { exporterCSV } from '@/lib/export';
@@ -575,6 +575,7 @@ export default function SchedulePage() {
   const [salles, setSalles] = useState([]);
   const [cours, setCours] = useState([]);
   const [emploi, setEmploi] = useState([]);
+  const [titulaires, setTitulaires] = useState([]);
   const [error, setError] = useState('');
 
   // Édition : modal d'ajout de créneau
@@ -587,8 +588,8 @@ export default function SchedulePage() {
     let actif = true;
     (async () => {
       try {
-        const [c, e, s, co, em] = await Promise.all([
-          getClasses(), getEnseignants(), getSalles(), getCours(), getEmploi(),
+        const [c, e, s, co, em, tits] = await Promise.all([
+          getClasses(), getEnseignants(), getSalles(), getCours(), getEmploi(), getTitulaires().catch(() => []),
         ]);
         if (!actif) return;
         setClasses(adaptClasses(c));
@@ -596,6 +597,7 @@ export default function SchedulePage() {
         setSalles(adaptSalles(s));
         setCours(adaptCours(co));
         setEmploi(adaptEmploi(em));
+        setTitulaires(Array.isArray(tits) ? tits : []);
       } catch (err) {
         if (actif) setError(err.message || "Erreur de chargement de l'emploi du temps.");
       }
@@ -693,8 +695,9 @@ export default function SchedulePage() {
       return emploi.filter(s => String(s.idClasse) === selectedFilter);
     }
     if (viewMode === 'teacher') {
-      const ens = enseignants.find(e => String(e.idPers) === selectedFilter);
-      const idC = ens?.idClasse;
+      // La classe d'un enseignant vient du titulariat (idPers -> salle -> classe).
+      const t = titulaires.find(tt => String(tt.personne?.idPers) === selectedFilter && Number(tt.actif) === 1);
+      const idC = t?.salle?.classe?.idClasse;
       return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
     }
     if (viewMode === 'room') {
@@ -703,7 +706,7 @@ export default function SchedulePage() {
       return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
     }
     return [];
-  }, [viewMode, selectedFilter, emploi, enseignants, salles]);
+  }, [viewMode, selectedFilter, emploi, enseignants, salles, titulaires]);
 
   const aucuneSelection = !selectedFilter;
 

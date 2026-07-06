@@ -239,12 +239,11 @@ function StaffPage() {
   const soumettreMembre = async (ev) => {
     ev.preventDefault();
     setFormErreur("");
-    const { nom, prenom, username, typePersonne, idClasse, idCours } = form;
+    const { nom, prenom, username, typePersonne, idCours } = form;
     if (!nom || !prenom || !username) {
       setFormErreur("Nom, prénom et email sont obligatoires.");
       return;
     }
-    if (Number(typePersonne) === 1 && !idClasse) { setFormErreur("Choisis la classe de l'enseignant."); return; }
 
     setEnvoi(true);
     try {
@@ -255,14 +254,18 @@ function StaffPage() {
         mobile: form.mobile.trim() || undefined,
         idAdmin,
       });
-      // 2) Si enseignant : l'enregistrer pour une CLASSE (+ matière de difficulté optionnelle)
+      // 2) Si enseignant : l'enregistrer SANS classe (+ matière de difficulté optionnelle)
       if (Number(typePersonne) === 1) {
         await createEnseignant({
           idPers: personne.idPers,
-          idClasse: Number(idClasse),
           idCours: idCours ? Number(idCours) : undefined,
           idAdmin,
         });
+        // 3) La classe se donne via le titulariat : si une salle est choisie,
+        //    on affecte tout de suite l'enseignant comme titulaire de cette salle.
+        if (form.idSalle) {
+          await createTitulaire({ idPers: personne.idPers, idSalle: Number(form.idSalle), idAdmin });
+        }
       }
       setModalOuvert(false);
       setForm(STAFF_VIDE);
@@ -497,7 +500,11 @@ function StaffPage() {
                         </span>
                       </div>
                     </td>
-                    <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.classe ? `${e.classe.libelle} · Salle ${(e.classe.salles || []).map((s) => s.libelle).join(" / ") || "—"}` : "—"}</td>
+                    <td style={{ ...tdStyle, color: "var(--muted)" }}>{(() => {
+                      // La classe d'un enseignant vient du titulariat (idPers -> salle -> classe)
+                      const t = titulaires.find((tt) => Number(tt.personne?.idPers) === Number(e.personne?.idPers) && Number(tt.actif) === 1);
+                      return t?.salle ? `${t.salle.classe?.libelle || "—"} · Salle ${t.salle.libelle}` : "— (non titulaire)";
+                    })()}</td>
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.cours?.libelle || "Aucune"}</td>
                     <td style={tdStyle}><StatutBadge actif={e.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
