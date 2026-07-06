@@ -5,10 +5,10 @@ import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
   getMessages, getMesMessages, getMessagesEnvoyes, getMessagesBrouillons, getMessagesStats,
-  envoyerMessage, envoyerMessageMasse, validerMessage, supprimerMessage,
+  envoyerMessage, envoyerMessageMasse, validerMessage, supprimerMessage, modifierMessage,
   getPersonnesTous, getEleves, getParentsEleve,
 } from "@/lib/api";
-import { MessageSquare, Plus, Check, Trash2, X, Send } from "lucide-react";
+import { MessageSquare, Plus, Check, Trash2, X, Send, Pencil } from "lucide-react";
 
 const TYPES = { 0: "Individuel", 1: "Tous les parents", 2: "Paiement" };
 
@@ -40,6 +40,7 @@ export default function MessagesPage() {
   const [form, setForm] = useState(FORM_VIDE);
   const [envoi, setEnvoi] = useState(false);
   const [formErreur, setFormErreur] = useState("");
+  const [editMsg, setEditMsg] = useState(null); // brouillon en cours d'édition (null = nouveau)
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -114,6 +115,16 @@ export default function MessagesPage() {
     finally { setBusyId(null); }
   };
 
+  const ouvrirEdition = (m) => {
+    setEditMsg(m);
+    setForm({ ...FORM_VIDE, objet: m.objet || "", information: m.information || "", type_message: String(m.type_message ?? 0) });
+    setParentsEleve([]);
+    setFormErreur("");
+    setModalOuvert(true);
+  };
+
+  const fermerModal = () => { setModalOuvert(false); setEditMsg(null); };
+
   const soumettre = async (ev) => {
     ev.preventDefault();
     setFormErreur("");
@@ -122,6 +133,19 @@ export default function MessagesPage() {
     }
     setEnvoi(true);
     try {
+      // Édition d'un brouillon existant : on ne change que objet/message/type.
+      if (editMsg) {
+        await modifierMessage(editMsg.idMessages, {
+          objet: form.objet.trim(),
+          information: form.information.trim(),
+          type_message: Number(form.type_message),
+        });
+        fermerModal();
+        setForm(FORM_VIDE);
+        await charger();
+        setEnvoi(false);
+        return;
+      }
       if (form.masse) {
         // Envoi de masse : à tous les parents de l'élève sélectionné
         const idParents = parentsEleve.map((p) => p.idParent);
@@ -178,7 +202,7 @@ export default function MessagesPage() {
             </p>
           </div>
         </div>
-        <button onClick={() => { setForm(FORM_VIDE); setParentsEleve([]); setFormErreur(""); setModalOuvert(true); }}
+        <button onClick={() => { setEditMsg(null); setForm(FORM_VIDE); setParentsEleve([]); setFormErreur(""); setModalOuvert(true); }}
           style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "11px 18px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", boxShadow: "0 4px 12px rgba(216,99,16,0.25)" }}>
           <Plus size={16} /> Nouveau message
         </button>
@@ -235,9 +259,14 @@ export default function MessagesPage() {
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   {Number(m.valider) !== 1 && (
-                    <button onClick={() => valider(m)} disabled={busyId === m.idMessages} title="Valider (envoyer)" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#16a34a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                      <Check size={14} /> Valider
-                    </button>
+                    <>
+                      <button onClick={() => ouvrirEdition(m)} disabled={busyId === m.idMessages} title="Modifier le brouillon" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        <Pencil size={14} /> Modifier
+                      </button>
+                      <button onClick={() => valider(m)} disabled={busyId === m.idMessages} title="Valider (envoyer)" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#16a34a", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        <Check size={14} /> Valider
+                      </button>
+                    </>
                   )}
                   <button onClick={() => supprimer(m)} disabled={busyId === m.idMessages} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                     <Trash2 size={14} />
@@ -251,39 +280,45 @@ export default function MessagesPage() {
 
       {/* ── Modal composition ── */}
       {modalOuvert && (
-        <div onClick={() => !envoi && setModalOuvert(false)} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
-          <div onClick={(ev) => ev.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)", maxHeight: "92vh", overflowY: "auto" }}>
+        <div onClick={() => !envoi && fermerModal()} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px", zIndex: 1000, overflowY: "auto" }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{ width: "100%", maxWidth: 560, margin: "auto", background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>Nouveau message</h2>
-              <button onClick={() => !envoi && setModalOuvert(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={22} /></button>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>{editMsg ? "Modifier le brouillon" : "Nouveau message"}</h2>
+              <button onClick={() => !envoi && fermerModal()} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={22} /></button>
             </div>
 
             <form onSubmit={soumettre} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <p style={{ fontSize: 12.5, color: "#8a7060", margin: 0 }}>
-                ✉️ Le message sera envoyé <b>en votre nom</b> (compte connecté).
+                {editMsg
+                  ? "✏️ Édition du brouillon : le destinataire ne change pas, seul le contenu est modifiable."
+                  : "✉️ Le message sera envoyé en votre nom (compte connecté)."}
               </p>
 
-              <div>
-                <label style={labelStyle}>Élève concerné *</label>
-                <select style={inputStyle} value={form.matricule} onChange={(e) => onSelectEleve(e.target.value)}>
-                  <option value="">— Choisir un élève —</option>
-                  {eleves.map((el) => <option key={el.matricule} value={el.matricule}>{el.prenom} {el.nom} (#{el.matricule})</option>)}
-                </select>
-              </div>
+              {!editMsg && (
+                <>
+                  <div>
+                    <label style={labelStyle}>Élève concerné *</label>
+                    <select style={inputStyle} value={form.matricule} onChange={(e) => onSelectEleve(e.target.value)}>
+                      <option value="">— Choisir un élève —</option>
+                      {eleves.map((el) => <option key={el.matricule} value={el.matricule}>{el.prenom} {el.nom} (#{el.matricule})</option>)}
+                    </select>
+                  </div>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4a3728", cursor: "pointer" }}>
-                <input type="checkbox" checked={form.masse} onChange={(e) => maj("masse", e.target.checked)} />
-                Envoyer à <b>tous les parents</b> de cet élève (envoi de masse)
-              </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4a3728", cursor: "pointer" }}>
+                    <input type="checkbox" checked={form.masse} onChange={(e) => maj("masse", e.target.checked)} />
+                    Envoyer à <b>tous les parents</b> de cet élève (envoi de masse)
+                  </label>
 
-              {!form.masse && (
-                <div>
-                  <label style={labelStyle}>Parent destinataire *</label>
-                  <select style={inputStyle} value={form.idParent} onChange={(e) => maj("idParent", e.target.value)} disabled={!form.matricule}>
-                    <option value="">{form.matricule ? "— Choisir un parent —" : "Choisis d'abord un élève"}</option>
-                    {parentsEleve.map((p) => <option key={p.idParent} value={p.idParent}>{p.personne?.prenom} {p.personne?.nom}</option>)}
-                  </select>
-                </div>
+                  {!form.masse && (
+                    <div>
+                      <label style={labelStyle}>Parent destinataire *</label>
+                      <select style={inputStyle} value={form.idParent} onChange={(e) => maj("idParent", e.target.value)} disabled={!form.matricule}>
+                        <option value="">{form.matricule ? "— Choisir un parent —" : "Choisis d'abord un élève"}</option>
+                        {parentsEleve.map((p) => <option key={p.idParent} value={p.idParent}>{p.personne?.prenom} {p.personne?.nom}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </>
               )}
 
               <div>
@@ -309,9 +344,9 @@ export default function MessagesPage() {
               )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 6 }}>
-                <button type="button" onClick={() => setModalOuvert(false)} disabled={envoi} style={{ padding: "11px 20px", borderRadius: 12, border: "1.5px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                <button type="button" onClick={fermerModal} disabled={envoi} style={{ padding: "11px 20px", borderRadius: 12, border: "1.5px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
                 <button type="submit" disabled={envoi} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "11px 24px", borderRadius: 12, border: "none", background: envoi ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  <Send size={15} /> {envoi ? "Envoi…" : "Envoyer"}
+                  {editMsg ? <><Check size={15} /> {envoi ? "Enregistrement…" : "Enregistrer"}</> : <><Send size={15} /> {envoi ? "Envoi…" : "Envoyer"}</>}
                 </button>
               </div>
             </form>

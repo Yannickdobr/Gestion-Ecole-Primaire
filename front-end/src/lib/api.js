@@ -249,6 +249,8 @@ export const envoyerMessageMasse = (data) =>
   apiFetch("/messagerie/masse", { method: "POST", body: JSON.stringify(data) });
 export const validerMessage = (id) =>
   apiFetch(`/messagerie/${id}/valider`, { method: "PATCH" });
+export const modifierMessage = (id, data) =>
+  apiFetch(`/messagerie/${id}`, { method: "PUT", body: JSON.stringify(data) });
 export const supprimerMessage = (id) =>
   apiFetch(`/messagerie/${id}`, { method: "DELETE" });
 
