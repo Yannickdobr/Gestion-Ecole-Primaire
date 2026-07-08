@@ -29,19 +29,27 @@ export class AdministrationService {
 
   private async adminParDefaut(idAdmin?: number): Promise<Admin> {
     if (idAdmin) {
-      const a = await this.adminRepo.findOne({ where: { ID: idAdmin } });
+      const a = await this.adminRepo.findOne({ where: { ID: idAdmin,
+          isDelete: 0
+    } });
       if (a) return a;
     }
-    return (await this.adminRepo.find({ order: { ID: 'ASC' }, take: 1 }))[0];
+    return (await this.adminRepo.find({
+        where: { isDelete: 0 },
+        order: { ID: 'ASC' }, take: 1 }))[0];
   }
 
   // ═══ JUSTIFICATIFS ═════════════════════════════════════════════════════════
   findAllJustificatifs(): Promise<Justificatifs[]> {
-    return this.justifRepo.find({ order: { created_at: 'DESC' } });
+    return this.justifRepo.find({
+        where: { isDelete: 0 },
+        order: { created_at: 'DESC' } });
   }
 
   findJustificatifsByRapport(idRapport: number): Promise<Justificatifs[]> {
-    return this.justifRepo.find({ where: { idRapport }, order: { created_at: 'DESC' } });
+    return this.justifRepo.find({ where: { idRapport,
+        isDelete: 0
+    }, order: { created_at: 'DESC' } });
   }
 
   createJustificatif(dto: CreateJustificatifDto): Promise<Justificatifs> {
@@ -55,7 +63,9 @@ export class AdministrationService {
   }
 
   async validerJustificatif(id: number, idDirecteur?: number): Promise<Justificatifs> {
-    const j = await this.justifRepo.findOne({ where: { ID: id } });
+    const j = await this.justifRepo.findOne({ where: { ID: id,
+        isDelete: 0
+    } });
     if (!j) throw new NotFoundException(`Justificatif introuvable (id: ${id})`);
     // Validé = un directeur est renseigné (repli sur l'admin racine si non fourni)
     j.idDirecteur = idDirecteur ?? (await this.adminParDefaut()).ID;
@@ -63,25 +73,34 @@ export class AdministrationService {
   }
 
   async removeJustificatif(id: number): Promise<{ message: string }> {
-    const j = await this.justifRepo.findOne({ where: { ID: id } });
+    const j = await this.justifRepo.findOne({ where: { ID: id,
+        isDelete: 0
+    } });
     if (!j) throw new NotFoundException(`Justificatif introuvable (id: ${id})`);
-    await this.justifRepo.remove(j);
+    j.isDelete = 1;
+    await this.justifRepo.save(j);
     return { message: `Justificatif ${id} supprimé` };
   }
 
   // ═══ FICHES ENSEIGNANT (RH) ════════════════════════════════════════════════
   findFichesByEnseignant(idEnseignant: number): Promise<FicheEnseignant[]> {
     return this.ficheRepo.find({
-      where: { enseignant: { idEnseignant } },
+      where: { enseignant: { idEnseignant },
+          isDelete: 0
+    },
       relations: ['anneeAcademique'],
       order: { created_at: 'DESC' },
     });
   }
 
   async createFiche(dto: CreateFicheEnseignantDto): Promise<FicheEnseignant> {
-    const enseignant = await this.enseignantRepo.findOne({ where: { idEnseignant: dto.idEnseignant } });
+    const enseignant = await this.enseignantRepo.findOne({ where: { idEnseignant: dto.idEnseignant,
+        isDelete: 0
+    } });
     if (!enseignant) throw new NotFoundException(`Enseignant introuvable (id: ${dto.idEnseignant})`);
-    const annee = await this.anneeRepo.findOne({ where: { idAnnee: dto.idAca } });
+    const annee = await this.anneeRepo.findOne({ where: { idAnnee: dto.idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${dto.idAca})`);
 
     // idAdministratif NOT NULL : fourni, sinon l'admin racine
@@ -100,15 +119,20 @@ export class AdministrationService {
   }
 
   async removeFiche(idRap: number): Promise<{ message: string }> {
-    const f = await this.ficheRepo.findOne({ where: { idRap } });
+    const f = await this.ficheRepo.findOne({ where: { idRap,
+        isDelete: 0
+    } });
     if (!f) throw new NotFoundException(`Fiche introuvable (id: ${idRap})`);
-    await this.ficheRepo.remove(f);
+    f.isDelete = 1;
+    await this.ficheRepo.save(f);
     return { message: `Fiche ${idRap} supprimée` };
   }
 
   // ═══ QUARTIERS ═════════════════════════════════════════════════════════════
   findAllQuartiers(): Promise<Quartier[]> {
-    return this.quartierRepo.find({ order: { libelle: 'ASC' } });
+    return this.quartierRepo.find({
+        where: { isDelete: 0 },
+        order: { libelle: 'ASC' } });
   }
 
   createQuartier(dto: CreateQuartierDto): Promise<Quartier> {
@@ -120,37 +144,47 @@ export class AdministrationService {
   }
 
   async removeQuartier(idQuartier: number): Promise<{ message: string }> {
-    const q = await this.quartierRepo.findOne({ where: { idQuartier } });
+    const q = await this.quartierRepo.findOne({ where: { idQuartier,
+        isDelete: 0
+    } });
     if (!q) throw new NotFoundException(`Quartier introuvable (id: ${idQuartier})`);
     await verifierAvantSuppression(
       this.quartierRepo.manager,
       `le quartier "${q.libelle}"`,
       [{ entity: Residents, where: { quartier: { idQuartier } }, label: (n) => `${n} résident(s)` }],
     );
-    await this.quartierRepo.remove(q);
+    q.isDelete = 1;
+    await this.quartierRepo.save(q);
     return { message: `Quartier "${q.libelle}" supprimé` };
   }
 
   // ═══ RÉSIDENTS (personne ↔ quartier) ═══════════════════════════════════════
   findAllResidents(): Promise<Residents[]> {
     return this.residentsRepo.find({
-      relations: ['personne', 'quartier'],
+        where: { isDelete: 0 },
+        relations: ['personne', 'quartier'],
       order: { created_at: 'DESC' },
     });
   }
 
   findResidentsByQuartier(idQuartier: number): Promise<Residents[]> {
     return this.residentsRepo.find({
-      where: { quartier: { idQuartier } },
+      where: { quartier: { idQuartier },
+          isDelete: 0
+    },
       relations: ['personne', 'quartier'],
       order: { created_at: 'DESC' },
     });
   }
 
   async createResident(dto: CreateResidentDto): Promise<Residents> {
-    const personne = await this.personneRepo.findOne({ where: { idPers: dto.idPers } });
+    const personne = await this.personneRepo.findOne({ where: { idPers: dto.idPers,
+        isDelete: 0
+    } });
     if (!personne) throw new NotFoundException(`Personne introuvable (id: ${dto.idPers})`);
-    const quartier = await this.quartierRepo.findOne({ where: { idQuartier: dto.idQuartier } });
+    const quartier = await this.quartierRepo.findOne({ where: { idQuartier: dto.idQuartier,
+        isDelete: 0
+    } });
     if (!quartier) throw new NotFoundException(`Quartier introuvable (id: ${dto.idQuartier})`);
 
     const r = this.residentsRepo.create({
@@ -163,9 +197,12 @@ export class AdministrationService {
   }
 
   async removeResident(idResi: number): Promise<{ message: string }> {
-    const r = await this.residentsRepo.findOne({ where: { idResi } });
+    const r = await this.residentsRepo.findOne({ where: { idResi,
+        isDelete: 0
+    } });
     if (!r) throw new NotFoundException(`Résident introuvable (id: ${idResi})`);
-    await this.residentsRepo.remove(r);
+    r.isDelete = 1;
+    await this.residentsRepo.save(r);
     return { message: `Résident ${idResi} supprimé` };
   }
 }

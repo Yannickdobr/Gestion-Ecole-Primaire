@@ -48,7 +48,7 @@ export class EmploiController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un jour' })
-  removeJour(@Param('id', ParseIntPipe) id: number) { return this.emploiService.removeJour(id); }
+  removeJour(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.emploiService.removeJour(id, force === 'true'); }
 
   // ── Créneaux ──────────────────────────────────────────────────────────
   @Get()
@@ -97,7 +97,7 @@ export class EmploiController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un créneau' })
-  removeCreneau(@Param('id', ParseIntPipe) id: number) { return this.emploiService.removeCreneau(id); }
+  removeCreneau(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.emploiService.removeCreneau(id, force === 'true'); }
 
   @Delete('classe/:idClasse/reset')
   @Roles(...DIRECTION)

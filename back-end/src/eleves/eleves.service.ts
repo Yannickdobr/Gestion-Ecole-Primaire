@@ -1,26 +1,27 @@
 import {
-    Injectable,
-    NotFoundException,
-    ConflictException,
-  } from '@nestjs/common';
-  import { InjectRepository } from '@nestjs/typeorm';
-  import { Repository } from 'typeorm';
-  import { Eleve } from '../entities/eleve.entity';
-  import { Parents } from '../entities/parents.entity';
-  import { VilleNaissance } from '../entities/ville-naissance.entity';
-  import { Admin } from '../entities/admin.entity';
-  import { Personne } from '../entities/personne.entity';
-  import { Frequente } from '../entities/frequente.entity';
-  import { Paiement } from '../entities/paiement.entity';
-  import { Evaluation } from '../entities/evaluation.entity';
-  import { Rapport } from '../entities/rapport.entity';
-  import { CreateEleveDto, UpdateEleveDto, AddParentDto } from './dto/eleve.dto';
-  
-  @Injectable()
-  export class ElevesService {
-    constructor(
-      @InjectRepository(Eleve)
-      private eleveRepository: Repository<Eleve>,
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Eleve } from "../entities/eleve.entity";
+import { Parents } from "../entities/parents.entity";
+import { VilleNaissance } from "../entities/ville-naissance.entity";
+import { Admin } from "../entities/admin.entity";
+import { Personne } from "../entities/personne.entity";
+import { Frequente } from "../entities/frequente.entity";
+import { Paiement } from "../entities/paiement.entity";
+import { Evaluation } from "../entities/evaluation.entity";
+import { Rapport } from "../entities/rapport.entity";
+import { CreateEleveDto, UpdateEleveDto, AddParentDto } from "./dto/eleve.dto";
+import { verifierAvantSuppression } from "../common/referential-integrity";
+
+@Injectable()
+export class ElevesService {
+  constructor(
+    @InjectRepository(Eleve)
+    private eleveRepository: Repository<Eleve>,
   
       @InjectRepository(Parents)
       private parentsRepository: Repository<Parents>,
@@ -53,7 +54,9 @@ import {
       // Rattacher la ville de naissance si fournie
       if (dto.idVilleNaissance) {
         const ville = await this.villeRepository.findOne({
-          where: { idVille: dto.idVilleNaissance },
+          where: { idVille: dto.idVilleNaissance,
+              isDelete: 0
+        },
         });
         if (!ville) {
           throw new NotFoundException(`Ville introuvable (id: ${dto.idVilleNaissance})`);
@@ -64,10 +67,14 @@ import {
       // Rattacher l'admin : celui fourni, sinon l'admin racine par défaut
       // (permet à la scolarité — une Personne, pas un Admin — d'inscrire des élèves)
       let admin = dto.idAdmin
-        ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+        ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin,
+            isDelete: 0
+        } })
         : null;
       if (!admin) {
-        const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+        const premier = await this.adminRepository.find({
+            where: { isDelete: 0 },
+            order: { ID: 'ASC' }, take: 1 });
         admin = premier[0] ?? null;
       }
       if (admin) eleve.admin = admin;
@@ -78,6 +85,7 @@ import {
     // ─── Lister tous les élèves ────────────────────────────────────────────────
     async findAll(): Promise<Eleve[]> {
       return this.eleveRepository.find({
+          where: { isDelete: 0 },
         relations: ['villeNaissance', 'parents', 'parents.personne'],
         order: { nom: 'ASC' },
       });
@@ -86,7 +94,9 @@ import {
     // ─── Lister uniquement les élèves actifs ───────────────────────────────────
     async findActifs(): Promise<Eleve[]> {
       return this.eleveRepository.find({
-        where: { actif: 1 },
+        where: { actif: 1,
+            isDelete: 0
+        },
         relations: ['villeNaissance', 'parents', 'parents.personne'],
         order: { nom: 'ASC' },
       });
@@ -95,7 +105,9 @@ import {
     // ─── Lister les enfants d'un parent (par idPers du parent) ────────────────
     async findByParent(idPers: number): Promise<Eleve[]> {
       const liens = await this.parentsRepository.find({
-        where: { personne: { idPers } },
+        where: { personne: { idPers },
+            isDelete: 0
+        },
         relations: ['eleve', 'eleve.villeNaissance'],
       });
       // Un parent peut être lié à plusieurs élèves ; on retourne les élèves
@@ -105,7 +117,9 @@ import {
     // ─── Trouver un élève par matricule ───────────────────────────────────────
     async findOne(matricule: number): Promise<Eleve> {
       const eleve = await this.eleveRepository.findOne({
-        where: { matricule },
+        where: { matricule,
+            isDelete: 0
+        },
         relations: ['villeNaissance', 'parents', 'parents.personne'],
       });
       if (!eleve) {
@@ -132,7 +146,9 @@ import {
       // Mise à jour ville de naissance
       if (dto.idVilleNaissance !== undefined) {
         const ville = await this.villeRepository.findOne({
-          where: { idVille: dto.idVilleNaissance },
+          where: { idVille: dto.idVilleNaissance,
+              isDelete: 0
+        },
         });
         if (!ville) {
           throw new NotFoundException(`Ville introuvable (id: ${dto.idVilleNaissance})`);
@@ -159,66 +175,54 @@ import {
     }
   
     // ─── Supprimer définitivement un élève ────────────────────────────────────
-    async remove(matricule: number): Promise<{ message: string }> {
-      const eleve = await this.findOne(matricule);
-      const m = this.eleveRepository.manager;
-      const [frequentations, parents, paiements, notes, bulletins] = await Promise.all([
-        m.count(Frequente, { where: { eleve: { matricule } } }),
-        m.count(Parents, { where: { eleve: { matricule } } }),
-        m.count(Paiement, { where: { eleve: { matricule } } }),
-        m.count(Evaluation, { where: { eleve: { matricule } } }),
-        m.count(Rapport, { where: { eleve: { matricule } } }),
-      ]);
-      const liens: string[] = [];
-      if (frequentations) liens.push(`${frequentations} affectation(s)`);
-      if (parents) liens.push(`${parents} lien(s) parent`);
-      if (paiements) liens.push(`${paiements} paiement(s)`);
-      if (notes) liens.push(`${notes} note(s)`);
-      if (bulletins) liens.push(`${bulletins} bulletin(s)`);
-      if (liens.length) {
-        throw new ConflictException(
-          `Impossible de supprimer définitivement cet élève : ${liens.join(', ')} lui sont rattaché(s). ` +
-            `Utilisez plutôt la désactivation pour conserver l'historique.`,
-        );
-      }
-      await this.eleveRepository.remove(eleve);
-      return { message: `Élève matricule ${matricule} supprimé définitivement` };
-    }
-  
-    // ─── Ajouter un parent à un élève ─────────────────────────────────────────
-    async addParent(matricule: number, dto: AddParentDto): Promise<Parents> {
-      const eleve = await this.findOne(matricule);
-  
-      const personne = await this.personneRepository.findOne({
-        where: { idPers: dto.idPers },
-        relations: ['admin'],
-      });
-      if (!personne) {
-        throw new NotFoundException(`Personne introuvable (id: ${dto.idPers})`);
-      }
-  
-      // Vérifier que ce parent n'est pas déjà lié à cet élève
-      const exists = await this.parentsRepository.findOne({
-        where: { personne: { idPers: dto.idPers }, eleve: { matricule } },
-      });
-      if (exists) {
-        throw new ConflictException('Ce parent est déjà lié à cet élève');
-      }
-  
-      const parent = this.parentsRepository.create({
-        personne,
-        eleve,
-        admin: personne.admin, // idAdmin NOT NULL en BD — repris de la personne
-      });
+    async remove(matricule: number, force: boolean = false): Promise<{ message: string }> {
+    const eleve = await this.findOne(matricule);
+    await verifierAvantSuppression(
+      this.eleveRepository.manager,
+      `l"�l�ve "${eleve.prenom} ${eleve.nom}"`,
+      [
+        { entity: Frequente, where: { eleve: { matricule } }, label: (n) => `${n} affectation(s)` },
+        { entity: Parents, where: { eleve: { matricule } }, label: (n) => `${n} lien(s) parent` },
+        { entity: Paiement, where: { eleve: { matricule } }, label: (n) => `${n} paiement(s)` },
+        { entity: Evaluation, where: { eleve: { matricule } }, label: (n) => `${n} note(s)` },
+        { entity: Rapport, where: { eleve: { matricule } }, label: (n) => `${n} bulletin(s)` },
+      ],
+      force
+    );
+    eleve.isDelete = 1;
+    await this.eleveRepository.save(eleve);
+    return { message: `�l�ve matricule ${matricule} supprim� d�finitivement` };
+  }
 
-      return this.parentsRepository.save(parent);
+  // ─── Ajouter un parent à un élève ──────────────────────────────────────────
+  async addParent(matricule: number, dto: AddParentDto): Promise<Parents> {
+    const eleve = await this.findOne(matricule);
+    const personne = await this.personneRepository.findOne({ where: { idPers: dto.idPers, isDelete: 0 } });
+    if (!personne) {
+      throw new NotFoundException(`Personne introuvable (id: ${dto.idPers})`);
     }
-  
-    // ─── Lister les parents d'un élève ────────────────────────────────────────
-    async getParents(matricule: number): Promise<Parents[]> {
+
+    const existing = await this.parentsRepository.findOne({
+      where: { eleve: { matricule }, personne: { idPers: dto.idPers }, isDelete: 0 }
+    });
+    if (existing) {
+      throw new ConflictException("Ce parent est déjà lié à cet élève.");
+    }
+
+    const parent = this.parentsRepository.create({
+      eleve,
+      personne,
+      admin: eleve.admin
+    });
+    return this.parentsRepository.save(parent);
+  }
+
+  async getParents(matricule: number): Promise<Parents[]> {
       await this.findOne(matricule); // vérifie que l'élève existe
       return this.parentsRepository.find({
-        where: { eleve: { matricule } },
+        where: { eleve: { matricule },
+            isDelete: 0
+        },
         relations: ['personne'],
       });
     }

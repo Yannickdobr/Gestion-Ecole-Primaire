@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, ParseIntPipe, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { ClassesService } from './classes.service';
@@ -41,7 +41,7 @@ export class ClassesController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer un cycle' })
-  removeCycle(@Param('id', ParseIntPipe) id: number) { return this.classesService.removeCycle(id); }
+  removeCycle(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.classesService.removeCycle(id, force === 'true'); }
 
   // ── Classes ─────────────────────────────────────────────────────────────
   @Get()
@@ -85,7 +85,7 @@ export class ClassesController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer une salle' })
-  removeSalle(@Param('id', ParseIntPipe) id: number) { return this.classesService.removeSalle(id); }
+  removeSalle(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.classesService.removeSalle(id, force === 'true'); }
 
   // ── Années académiques ───────────────────────────────────────────────────
   @Get('annees')
@@ -108,7 +108,7 @@ export class ClassesController {
   @Delete('annees/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une année académique' })
-  removeAnnee(@Param('id', ParseIntPipe) id: number) { return this.classesService.removeAnnee(id); }
+  removeAnnee(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.classesService.removeAnnee(id, force === 'true'); }
 
   // ── Classe par id (déclaré après les routes statiques pour éviter la collision) ──
   @Get(':id')
@@ -124,7 +124,7 @@ export class ClassesController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer une classe' })
-  removeClasse(@Param('id', ParseIntPipe) id: number) { return this.classesService.removeClasse(id); }
+  removeClasse(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.classesService.removeClasse(id, force === 'true'); }
 
   // ── Fréquentation ────────────────────────────────────────────────────────
   @Post('affecter')
@@ -148,5 +148,5 @@ export class ClassesController {
   @Delete('frequente/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une affectation élève-salle' })
-  removeAffectation(@Param('id', ParseIntPipe) id: number) { return this.classesService.removeAffectation(id); }
+  removeAffectation(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.classesService.removeAffectation(id, force === 'true'); }
 }

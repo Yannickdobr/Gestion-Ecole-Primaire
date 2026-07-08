@@ -34,7 +34,7 @@ export async function apiFetch(path, options = {}) {
     const msg = Array.isArray(data.message)
       ? data.message.join(", ")
       : data.message || `Erreur ${res.status}`;
-    throw new Error(msg);
+    const err = new Error(msg); err.status = res.status; err.requireConfirmation = data.requireConfirmation; err.impact = data.impact; throw err;
   }
 
   return data;
@@ -75,7 +75,8 @@ export const getProfil = () => apiFetch("/auth/profil");
 export const getAdmins = () => apiFetch("/auth/admins");
 export const createAdmin = (data) =>
   apiFetch("/auth/admins", { method: "POST", body: JSON.stringify(data) });
-export const deleteAdmin = (id) => apiFetch(`/auth/admins/${id}`, { method: "DELETE" });
+export const deleteAdmin = (id, force = false) =>
+  apiFetch(`/auth/admins/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 
 /** Changer son mot de passe : PATCH /auth/password */
 export const changePassword = (data) =>
@@ -102,7 +103,8 @@ export function login(username, password) {
 export const getEleves = () => apiFetch("/eleves");
 export const getElevesActifs = () => apiFetch("/eleves/actifs");
 export const getEleve = (matricule) => apiFetch(`/eleves/${matricule}`);
-export const deleteEleve = (matricule) => apiFetch(`/eleves/${matricule}`, { method: "DELETE" });
+export const deleteEleve = (matricule, force = false) =>
+  apiFetch(`/eleves/${matricule}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const getElevesByParent = (idPers) =>
   apiFetch(`/eleves/parent/${idPers}`);
 export const affecterEleve = (data) =>
@@ -129,8 +131,8 @@ export const getTitulaires = () => apiFetch("/professeurs/titulaires");
 export const getPersonnes = () => apiFetch("/professeurs/personnes");
 export const createPersonne = (data) =>
   apiFetch("/professeurs/personnes", { method: "POST", body: JSON.stringify(data) });
-export const deletePersonne = (id) =>
-  apiFetch(`/professeurs/personnes/${id}`, { method: "DELETE" });
+export const deletePersonne = (id, force = false) =>
+  apiFetch(`/professeurs/personnes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const addParentToEleve = (matricule, data) =>
   apiFetch(`/eleves/${matricule}/parents`, { method: "POST", body: JSON.stringify(data) });
 
@@ -156,28 +158,32 @@ export const createCycle = (data) =>
   apiFetch("/classes/cycles", { method: "POST", body: JSON.stringify(data) });
 export const updateCycle = (id, data) =>
   apiFetch(`/classes/cycles/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deleteCycle = (id) => apiFetch(`/classes/cycles/${id}`, { method: "DELETE" });
+export const deleteCycle = (id, force = false) =>
+  apiFetch(`/classes/cycles/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const createClasse = (data) =>
   apiFetch("/classes", { method: "POST", body: JSON.stringify(data) });
 export const updateClasse = (id, data) =>
   apiFetch(`/classes/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deleteClasse = (id) => apiFetch(`/classes/${id}`, { method: "DELETE" });
+export const deleteClasse = (id, force = false) =>
+  apiFetch(`/classes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const createSalle = (data) =>
   apiFetch("/classes/salles", { method: "POST", body: JSON.stringify(data) });
 export const updateSalle = (id, data) =>
   apiFetch(`/classes/salles/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deleteSalle = (id) => apiFetch(`/classes/salles/${id}`, { method: "DELETE" });
+export const deleteSalle = (id, force = false) =>
+  apiFetch(`/classes/salles/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const createCours = (data) =>
   apiFetch("/cours", { method: "POST", body: JSON.stringify(data) });
 export const updateCours = (id, data) =>
   apiFetch(`/cours/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deleteCours = (id) => apiFetch(`/cours/${id}`, { method: "DELETE" });
+export const deleteCours = (id, force = false) =>
+  apiFetch(`/cours/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 
 export const getVilles = () => apiFetch("/villes");
 export const seedVilles = () => apiFetch("/villes/seed", { method: "POST" });
 
 export const getCours = () => apiFetch("/cours");
-export const getCoursParClasse = (idClasse) => apiFetch(`/cours/par-classe/${idClasse}`);
+
 // Matière de difficulté d'un enseignant (écrit idCours existant ; null pour effacer)
 export const setMatiereDifficulte = (idEnseignant, idCours) =>
   apiFetch(`/professeurs/enseignants/${idEnseignant}/difficulte`, { method: "PATCH", body: JSON.stringify({ idCours: idCours ?? null }) });
@@ -188,8 +194,8 @@ export const createLivre = (data) =>
   apiFetch("/cours/livres", { method: "POST", body: JSON.stringify(data) });
 export const updateLivre = (id, data) =>
   apiFetch(`/cours/livres/${id}`, { method: "PUT", body: JSON.stringify(data) });
-export const deleteLivre = (id) =>
-  apiFetch(`/cours/livres/${id}`, { method: "DELETE" });
+export const deleteLivre = (id, force = false) =>
+  apiFetch(`/cours/livres/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const getSpecialites = () => apiFetch("/cours/specialites");
 export const createSpecialite = (data) =>
   apiFetch("/cours/specialites", { method: "POST", body: JSON.stringify(data) });
@@ -205,8 +211,8 @@ export const getEmploiParClasse = (idClasse) =>
   apiFetch(`/emploi/classe/${idClasse}`);
 export const createEmploi = (data) =>
   apiFetch("/emploi", { method: "POST", body: JSON.stringify(data) });
-export const deleteEmploi = (id) =>
-  apiFetch(`/emploi/${id}`, { method: "DELETE" });
+export const deleteEmploi = (id, force = false) =>
+  apiFetch(`/emploi/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const verifierConflitsEmploi = (data) =>
   apiFetch("/emploi/verifier-conflits", { method: "POST", body: JSON.stringify(data) });
 
@@ -274,28 +280,28 @@ export const createJustificatif = (data) =>
   apiFetch("/justificatifs", { method: "POST", body: JSON.stringify(data) });
 export const validerJustificatif = (id) =>
   apiFetch(`/justificatifs/${id}/valider`, { method: "PATCH" });
-export const deleteJustificatif = (id) =>
-  apiFetch(`/justificatifs/${id}`, { method: "DELETE" });
+export const deleteJustificatif = (id, force = false) =>
+  apiFetch(`/justificatifs/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 
 // Fiches enseignant (suivi RH)
 export const getFichesEnseignant = (idEnseignant) =>
   apiFetch(`/fiches-enseignant/enseignant/${idEnseignant}`);
 export const createFicheEnseignant = (data) =>
   apiFetch("/fiches-enseignant", { method: "POST", body: JSON.stringify(data) });
-export const deleteFicheEnseignant = (idRap) =>
-  apiFetch(`/fiches-enseignant/${idRap}`, { method: "DELETE" });
+export const deleteFicheEnseignant = (idRap, force = false) =>
+  apiFetch(`/fiches-enseignant/${idRap}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 
 // Résidence (quartiers / résidents)
 export const getQuartiers = () => apiFetch("/residence/quartiers");
 export const createQuartier = (data) =>
   apiFetch("/residence/quartiers", { method: "POST", body: JSON.stringify(data) });
-export const deleteQuartier = (id) =>
-  apiFetch(`/residence/quartiers/${id}`, { method: "DELETE" });
+export const deleteQuartier = (id, force = false) =>
+  apiFetch(`/residence/quartiers/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const getResidents = () => apiFetch("/residence/residents");
 export const createResident = (data) =>
   apiFetch("/residence/residents", { method: "POST", body: JSON.stringify(data) });
-export const deleteResident = (id) =>
-  apiFetch(`/residence/residents/${id}`, { method: "DELETE" });
+export const deleteResident = (id, force = false) =>
+  apiFetch(`/residence/residents/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const getNotesEleve = (matricule) =>
   apiFetch(`/evaluations/notes/eleve/${matricule}`);
 
@@ -317,3 +323,18 @@ export const createEpreuve = (data) =>
 export const saisirNote = (data) =>
   apiFetch("/evaluations/notes", { method: "POST", body: JSON.stringify(data) });
 
+export const updateAnnee = (id, data) => apiFetch(`/classes/annees/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteAnnee = (id, force = false) =>
+  apiFetch(`/classes/annees/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+export const updateTrimestre = (id, data) => apiFetch(`/evaluations/trimestres/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteTrimestre = (id, force = false) =>
+  apiFetch(`/evaluations/trimestres/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+export const updateSession = (id, data) => apiFetch(`/evaluations/sessions/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteSession = (id, force = false) =>
+  apiFetch(`/evaluations/sessions/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+export const updateNature = (id, data) => apiFetch(`/evaluations/natures/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteNature = (id, force = false) =>
+  apiFetch(`/evaluations/natures/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+export const updateEpreuve = (id, data) => apiFetch(`/evaluations/epreuves/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteEpreuve = (id, force = false) =>
+  apiFetch(`/evaluations/epreuves/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });

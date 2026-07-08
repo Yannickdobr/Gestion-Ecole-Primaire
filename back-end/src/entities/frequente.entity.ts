@@ -18,6 +18,9 @@ import { Eleve } from './eleve.entity';
  */
 @Entity('frequente')
 export class Frequente {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idFrequente: number;
 

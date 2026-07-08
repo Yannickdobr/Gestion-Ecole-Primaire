@@ -26,12 +26,16 @@ export class NotificationService {
   /** Expéditeur institutionnel : l'utilisateur déclencheur (si Personne) ou un membre du personnel. */
   private async expediteurSysteme(expediteurId?: number): Promise<Personne | null> {
     if (expediteurId) {
-      const p = await this.personneRepo.findOne({ where: { idPers: expediteurId } });
+      const p = await this.personneRepo.findOne({ where: { idPers: expediteurId,
+          isDelete: 0
+    } });
       if (p) return p;
     }
     // Personnel non-parent (scolarité, administratif, enseignant, autres) par défaut.
     return this.personneRepo.findOne({
-      where: { typePersonne: In([3, 2, 1, 5]) },
+      where: { typePersonne: In([3, 2, 1, 5]),
+          isDelete: 0
+    },
       order: { idPers: 'ASC' },
     });
   }
@@ -44,7 +48,9 @@ export class NotificationService {
     opts?: { expediteurId?: number; annee?: string; type?: number },
   ): Promise<{ inApp: number; emails: number }> {
     const liens = await this.parentsRepo.find({
-      where: { eleve: { matricule } },
+      where: { eleve: { matricule },
+          isDelete: 0
+    },
       relations: ['personne', 'eleve'],
     });
     if (!liens.length) return { inApp: 0, emails: 0 };

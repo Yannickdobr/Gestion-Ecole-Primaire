@@ -13,6 +13,9 @@ import { Cours } from './cours.entity';
  */
 @Entity('emploidutemps')
 export class EmploiDuTemps {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idTemps: number;
 

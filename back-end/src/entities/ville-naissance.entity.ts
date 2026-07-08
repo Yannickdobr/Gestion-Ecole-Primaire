@@ -7,6 +7,9 @@ import { Eleve } from './eleve.entity';
  */
 @Entity('villenaissance')
 export class VilleNaissance {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idVille: number;
 

@@ -18,6 +18,9 @@ import {
   @Entity('parents')
   @Unique('uniqueParent', ['personne', 'eleve'])
   export class Parents {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
     @PrimaryGeneratedColumn({ type: 'int' })
     idParent: number;
   

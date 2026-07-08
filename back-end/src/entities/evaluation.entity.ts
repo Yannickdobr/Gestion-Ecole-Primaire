@@ -18,6 +18,9 @@ import { Personne } from './personne.entity';
  */
 @Entity('evaluation')
 export class Evaluation {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idEval: number;
 

@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getCycles, getClasses, getCours, getSalles,
+  getCycles, getClasses, getCours, getSalles, getLivres,
   createCycle, createClasse, createCours, createSalle,
   updateCycle, updateClasse, updateCours, updateSalle, deleteSalle, deleteClasse, deleteCycle, deleteCours,
 } from "@/lib/api";
 import { Layers, Plus, Trash2, Pencil, X } from "lucide-react";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import ManagerOnly from "@/components/ManagerOnly";
 
 const thStyle = { padding: "14px 22px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -29,14 +30,16 @@ function AcademicPage() {
   const [classes, setClasses] = useState([]);
   const [cours, setCours] = useState([]);
   const [salles, setSalles] = useState([]);
+  const [livres, setLivres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [envoi, setEnvoi] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, type: null, impact: [], message: "" });
 
   // Formulaires
   const [fCycle, setFCycle] = useState({ libelle: "", description: "" });
   const [fClasse, setFClasse] = useState({ libelle: "", idCycle: "" });
-  const [fCours, setFCours] = useState({ libelle: "", description: "", coefficient: "1", idClasse: "" });
+  const [fCours, setFCours] = useState({ libelle: "", description: "", coefficient: "1", idLivre: "" });
   const [fSalle, setFSalle] = useState({ libelle: "", surface: "", position: "", idClasse: "" });
 
   // Édition (modal générique)
@@ -48,7 +51,7 @@ function AcademicPage() {
     setEditErr("");
     if (type === "cycle") setEditForm({ libelle: item.libelle || "", description: item.description && item.description !== "INDEFINI" ? item.description : "" });
     if (type === "classe") setEditForm({ libelle: item.libelle || "", idCycle: item.cycle?.idCycle ? String(item.cycle.idCycle) : "" });
-    if (type === "cours") setEditForm({ libelle: item.libelle || "", coefficient: String(item.coefficient ?? 1), description: item.description && item.description !== "INDEFINI" ? item.description : "", idClasse: item.classe?.idClasse ? String(item.classe.idClasse) : "" });
+    if (type === "cours") setEditForm({ libelle: item.libelle || "", coefficient: String(item.coefficient ?? 1), description: item.description && item.description !== "INDEFINI" ? item.description : "", idLivre: item.livre?.idLivre ? String(item.livre.idLivre) : "" });
     if (type === "salle") setEditForm({ libelle: item.libelle || "", surface: item.surface && item.surface !== "INDEFINI" ? item.surface : "", position: item.position && item.position !== "INDEFINI" ? item.position : "", idClasse: item.classe?.idClasse ? String(item.classe.idClasse) : "" });
     setEditItem({ type, id: item.idCycle ?? item.idClasse ?? item.idCours ?? item.idSalle });
   };
@@ -62,7 +65,7 @@ function AcademicPage() {
     try {
       if (type === "cycle") await updateCycle(id, { libelle: editForm.libelle.trim(), description: editForm.description?.trim() || "INDEFINI" });
       if (type === "classe") { if (!editForm.idCycle) { setEditErr("Cycle requis."); setEnvoi(false); return; } await updateClasse(id, { libelle: editForm.libelle.trim(), idCycle: Number(editForm.idCycle) }); }
-      if (type === "cours") { if (!editForm.idClasse) { setEditErr("Classe requise."); setEnvoi(false); return; } await updateCours(id, { libelle: editForm.libelle.trim(), coefficient: Number(editForm.coefficient) || 1, description: editForm.description?.trim() || "INDEFINI", idClasse: Number(editForm.idClasse) }); }
+      if (type === "cours") { await updateCours(id, { libelle: editForm.libelle.trim(), coefficient: Number(editForm.coefficient) || 1, description: editForm.description?.trim() || "INDEFINI", idLivre: Number(editForm.idLivre) || null }); }
       if (type === "salle") { if (!editForm.idClasse) { setEditErr("Classe requise."); setEnvoi(false); return; } await updateSalle(id, { libelle: editForm.libelle.trim(), surface: editForm.surface?.trim() || "INDEFINI", position: editForm.position?.trim() || "INDEFINI", idClasse: Number(editForm.idClasse) }); }
       setEditItem(null);
       await charger();
@@ -74,11 +77,12 @@ function AcademicPage() {
     setLoading(true);
     setError("");
     try {
-      const [cy, cl, co, sa] = await Promise.all([getCycles(), getClasses(), getCours(), getSalles()]);
+      const [cy, cl, co, sa, li] = await Promise.all([getCycles(), getClasses(), getCours(), getSalles(), getLivres()]);
       setCycles(Array.isArray(cy) ? cy : []);
       setClasses(Array.isArray(cl) ? cl : []);
       setCours(Array.isArray(co) ? co : []);
       setSalles(Array.isArray(sa) ? sa : []);
+      setLivres(Array.isArray(li) ? li : []);
     } catch (e) {
       setError(e.message || "Erreur de chargement.");
     } finally {
@@ -114,7 +118,7 @@ function AcademicPage() {
 
   const ajouterCours = async (e) => {
     e.preventDefault();
-    if (!fCours.libelle.trim() || !fCours.idClasse) { setError("Libellé et classe requis."); return; }
+    if (!fCours.libelle.trim()) { setError("Libellé requis."); return; }
     setEnvoi(true); setError("");
     try {
       await createCours({
@@ -122,10 +126,10 @@ function AcademicPage() {
         description: fCours.description.trim() || "INDEFINI",
         coefficient: Number(fCours.coefficient) || 1,
         note: 0,
-        idClasse: Number(fCours.idClasse),
+        idLivre: Number(fCours.idLivre) || null,
         idAdmin,
       });
-      setFCours({ libelle: "", description: "", coefficient: "1", idClasse: "" });
+      setFCours({ libelle: "", description: "", coefficient: "1", idLivre: "" });
       await charger();
     } catch (err) { setError(err.message || "Échec de la création du cours."); }
     finally { setEnvoi(false); }
@@ -159,44 +163,25 @@ function AcademicPage() {
     } catch (err) { setError(err.message || "Échec du changement de classe."); }
     finally { setEnvoi(false); }
   };
-  const handleSupprimerSalle = async (s) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer la salle "${s.libelle}" ?`)) return;
+  const handleConfirmDelete = async () => {
+    const { item, type, impact } = deleteModal;
+    const force = impact && impact.length > 0;
     setEnvoi(true); setError("");
     try {
-      await deleteSalle(s.idSalle);
-      await charger();
-    } catch (err) { setError(err.message || "Échec de la suppression."); }
-    finally { setEnvoi(false); }
-  };
+      if (type === 'salle') await deleteSalle(item.idSalle, force);
+      else if (type === 'cycle') await deleteCycle(item.idCycle, force);
+      else if (type === 'cours') await deleteCours(item.idCours, force);
+      else if (type === 'classe') await deleteClasse(item.idClasse, force);
 
-  const handleSupprimerCycle = async (c) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer le cycle "${c.libelle}" ?`)) return;
-    setEnvoi(true); setError("");
-    try {
-      await deleteCycle(c.idCycle);
+      setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" });
       await charger();
-    } catch (err) { setError(err.message || "Échec de la suppression."); }
-    finally { setEnvoi(false); }
-  };
-
-  const handleSupprimerCours = async (c) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer le cours "${c.libelle}" ?`)) return;
-    setEnvoi(true); setError("");
-    try {
-      await deleteCours(c.idCours);
-      await charger();
-    } catch (err) { setError(err.message || "Échec de la suppression."); }
-    finally { setEnvoi(false); }
-  };
-
-  const handleSupprimerClasse = async (c) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer la classe "${c.libelle}" ?`)) return;
-    setEnvoi(true); setError("");
-    try {
-      await deleteClasse(c.idClasse);
-      await charger();
-    } catch (err) { setError(err.message || "Échec de la suppression."); }
-    finally { setEnvoi(false); }
+    } catch (err) {
+      if (err.requireConfirmation) {
+        setDeleteModal({ ...deleteModal, impact: err.impact, message: err.message });
+      } else {
+        setError(err.message || "Échec de la suppression.");
+      }
+    } finally { setEnvoi(false); }
   };
 
 
@@ -249,7 +234,7 @@ function AcademicPage() {
                       <td style={{ ...tdStyle, textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
                           <BtnEdit onClick={() => ouvrirEdit("cycle", c)} />
-                          <button onClick={() => handleSupprimerCycle(c)} disabled={envoi} title="Supprimer le cycle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <button onClick={() => setDeleteModal({ isOpen: true, item: c, type: 'cycle', impact: [], message: `Voulez-vous vraiment supprimer le cycle "${c.libelle}" ?` })} disabled={envoi} title="Supprimer le cycle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                             <Trash2 size={14} /> Supprimer
                           </button>
                         </div>
@@ -270,7 +255,7 @@ function AcademicPage() {
                       <td style={{ ...tdStyle, textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
                           <BtnEdit onClick={() => ouvrirEdit("classe", c)} />
-                          <button onClick={() => handleSupprimerClasse(c)} disabled={envoi} title="Supprimer la classe" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <button onClick={() => setDeleteModal({ isOpen: true, item: c, type: 'classe', impact: [], message: `Voulez-vous vraiment supprimer la classe "${c.libelle}" ?` })} disabled={envoi} title="Supprimer la classe" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                             <Trash2 size={14} /> Supprimer
                           </button>
                         </div>
@@ -281,18 +266,17 @@ function AcademicPage() {
             </table>
           ) : tab === "cours" ? (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Classe</th><th style={thStyle}>Coef.</th><th style={{ ...thStyle, textAlign: "right" }}>Actions</th></tr></thead>
+              <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Coef.</th><th style={{ ...thStyle, textAlign: "right" }}>Actions</th></tr></thead>
               <tbody>
                 {cours.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={4}>Aucun cours.</td></tr> :
                   cours.map((c) => (
                     <tr key={c.idCours}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{c.libelle}</td>
-                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.classe?.libelle || "—"}</td>
                       <td style={{ ...tdStyle, color: "var(--muted)" }}>{c.coefficient}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
                           <BtnEdit onClick={() => ouvrirEdit("cours", c)} />
-                          <button onClick={() => handleSupprimerCours(c)} disabled={envoi} title="Supprimer le cours" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <button onClick={() => setDeleteModal({ isOpen: true, item: c, type: 'cours', impact: [], message: `Voulez-vous vraiment supprimer le cours "${c.libelle}" ?` })} disabled={envoi} title="Supprimer le cours" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                             <Trash2 size={14} /> Supprimer
                           </button>
                         </div>
@@ -325,7 +309,7 @@ function AcademicPage() {
                       <td style={{ ...tdStyle, textAlign: "right" }}>
                         <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
                           <BtnEdit onClick={() => ouvrirEdit("salle", s)} />
-                          <button onClick={() => handleSupprimerSalle(s)} disabled={envoi} title="Supprimer la salle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <button onClick={() => setDeleteModal({ isOpen: true, item: s, type: 'salle', impact: [], message: `Voulez-vous vraiment supprimer la salle "${s.libelle}" ?` })} disabled={envoi} title="Supprimer la salle" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                             <Trash2 size={14} /> Supprimer
                           </button>
                         </div>
@@ -370,17 +354,17 @@ function AcademicPage() {
             <form onSubmit={ajouterCours} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div><label style={labelStyle}>Libellé *</label><input style={inputStyle} value={fCours.libelle} onChange={(e) => setFCours((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : Mathématiques" /></div>
               <div>
-                <label style={labelStyle}>Classe *</label>
-                <select style={inputStyle} value={fCours.idClasse} onChange={(e) => setFCours((s) => ({ ...s, idClasse: e.target.value }))}>
-                  <option value="">— Choisir —</option>
-                  {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
+                <label style={labelStyle}>Livre associé</label>
+                <select style={inputStyle} value={fCours.idLivre} onChange={(e) => setFCours((s) => ({ ...s, idLivre: e.target.value }))}>
+                  <option value="">— Aucun —</option>
+                  {livres.map((l) => <option key={l.idLivre} value={l.idLivre}>{l.titre || l.titreLivre}</option>)}
                 </select>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={labelStyle}>Coefficient</label><input type="number" min="0" step="0.5" style={inputStyle} value={fCours.coefficient} onChange={(e) => setFCours((s) => ({ ...s, coefficient: e.target.value }))} /></div>
               </div>
               <div><label style={labelStyle}>Description</label><input style={inputStyle} value={fCours.description} onChange={(e) => setFCours((s) => ({ ...s, description: e.target.value }))} placeholder="Optionnel" /></div>
-              <SubmitBtn envoi={envoi} disabled={classes.length === 0} hint={classes.length === 0 ? "Crée d'abord une classe." : ""} />
+              <SubmitBtn envoi={envoi} />
             </form>
           )}
 
@@ -429,10 +413,10 @@ function AcademicPage() {
                 </div>
               )}
               {editItem.type === "cours" && (<>
-                <div><label style={labelStyle}>Classe *</label>
-                  <select style={inputStyle} value={editForm.idClasse || ""} onChange={(e) => setEditForm((f) => ({ ...f, idClasse: e.target.value }))}>
-                    <option value="">— Choisir —</option>
-                    {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
+                <div><label style={labelStyle}>Livre associé</label>
+                  <select style={inputStyle} value={editForm.idLivre || ""} onChange={(e) => setEditForm((f) => ({ ...f, idLivre: e.target.value }))}>
+                    <option value="">— Aucun —</option>
+                    {livres.map((l) => <option key={l.idLivre} value={l.idLivre}>{l.titre || l.titreLivre}</option>)}
                   </select>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -462,6 +446,14 @@ function AcademicPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" })}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

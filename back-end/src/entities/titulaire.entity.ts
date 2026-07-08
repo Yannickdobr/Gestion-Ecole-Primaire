@@ -17,6 +17,9 @@ import { Salle } from './salle.entity';
  */
 @Entity('titulaire')
 export class Titulaire {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idTitulaire: number;
 

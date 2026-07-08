@@ -71,7 +71,9 @@ export class EvaluationsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createTrimestre(dto: CreateTrimestreDto): Promise<Trimestre> {
-    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca } });
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${dto.idAca})`);
 
     const trimestre = this.trimestreRepository.create({
@@ -80,7 +82,9 @@ export class EvaluationsService {
       anneeAcademique: annee,
     });
     if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
+      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin,
+          isDelete: 0
+    } });
       if (admin) trimestre.admin = admin;
     }
     return this.trimestreRepository.save(trimestre);
@@ -88,14 +92,17 @@ export class EvaluationsService {
 
   async findAllTrimestres(): Promise<Trimestre[]> {
     return this.trimestreRepository.find({
-      relations: ['anneeAcademique'],
+        where: { isDelete: 0 },
+        relations: ['anneeAcademique'],
       order: { libelle: 'ASC' },
     });
   }
 
   async findTrimestresByAnnee(idAnnee: number): Promise<Trimestre[]> {
     return this.trimestreRepository.find({
-      where: { anneeAcademique: { idAnnee } },
+      where: { anneeAcademique: { idAnnee },
+          isDelete: 0
+    },
       relations: ['anneeAcademique', 'sessions'],
       order: { libelle: 'ASC' },
     });
@@ -103,7 +110,9 @@ export class EvaluationsService {
 
   async findTrimestreById(idTrimes: number): Promise<Trimestre> {
     const t = await this.trimestreRepository.findOne({
-      where: { idTrimes },
+      where: { idTrimes,
+          isDelete: 0
+    },
       relations: ['anneeAcademique', 'sessions'],
     });
     if (!t) throw new NotFoundException(`Trimestre introuvable (id: ${idTrimes})`);
@@ -115,21 +124,25 @@ export class EvaluationsService {
     if (dto.libelle !== undefined) t.libelle = dto.libelle;
     if (dto.periode !== undefined) t.periode = dto.periode;
     if (dto.idAca !== undefined) {
-      const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca } });
+      const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca,
+          isDelete: 0
+    } });
       if (!annee) throw new NotFoundException(`Année introuvable (id: ${dto.idAca})`);
       t.anneeAcademique = annee;
     }
     return this.trimestreRepository.save(t);
   }
 
-  async removeTrimestre(idTrimes: number): Promise<{ message: string }> {
+  async removeTrimestre(idTrimes: number, force: boolean = false): Promise<{ message: string }> {
     const t = await this.findTrimestreById(idTrimes);
     await verifierAvantSuppression(
       this.trimestreRepository.manager,
       `le trimestre "${t.libelle}"`,
       [{ entity: Session, where: { trimestre: { idTrimes } }, label: (n) => `${n} session(s)` }],
+      force
     );
-    await this.trimestreRepository.remove(t);
+    t.isDelete = 1;
+    await this.trimestreRepository.save(t);
     return { message: `Trimestre "${t.libelle}" supprimé` };
   }
 
@@ -140,7 +153,9 @@ export class EvaluationsService {
   async createSession(dto: CreateSessionDto): Promise<Session> {
     const trimestre = await this.findTrimestreById(dto.idTrimestre);
     // responsable (idPers) est NOT NULL en BD
-    const responsable = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+    const responsable = await this.personneRepository.findOne({ where: { idPers: dto.idPers,
+        isDelete: 0
+    } });
     if (!responsable) throw new NotFoundException(`Personne introuvable (idPers: ${dto.idPers})`);
     const session = this.sessionRepository.create({
       libelle: dto.libelle,
@@ -153,14 +168,17 @@ export class EvaluationsService {
 
   async findAllSessions(): Promise<Session[]> {
     return this.sessionRepository.find({
-      relations: ['trimestre', 'trimestre.anneeAcademique'],
+        where: { isDelete: 0 },
+        relations: ['trimestre', 'trimestre.anneeAcademique'],
       order: { libelle: 'ASC' },
     });
   }
 
   async findSessionsByTrimestre(idTrimes: number): Promise<Session[]> {
     return this.sessionRepository.find({
-      where: { trimestre: { idTrimes } },
+      where: { trimestre: { idTrimes },
+          isDelete: 0
+    },
       relations: ['trimestre'],
       order: { libelle: 'ASC' },
     });
@@ -168,7 +186,9 @@ export class EvaluationsService {
 
   async findSessionById(idSession: number): Promise<Session> {
     const s = await this.sessionRepository.findOne({
-      where: { idSession },
+      where: { idSession,
+          isDelete: 0
+    },
       relations: ['trimestre', 'trimestre.anneeAcademique'],
     });
     if (!s) throw new NotFoundException(`Session introuvable (id: ${idSession})`);
@@ -185,14 +205,16 @@ export class EvaluationsService {
     return this.sessionRepository.save(s);
   }
 
-  async removeSession(idSession: number): Promise<{ message: string }> {
+  async removeSession(idSession: number, force: boolean = false): Promise<{ message: string }> {
     const s = await this.findSessionById(idSession);
     await verifierAvantSuppression(
       this.sessionRepository.manager,
       `la session "${s.libelle}"`,
       [{ entity: Evaluation, where: { session: { idSession } }, label: (n) => `${n} note(s)` }],
+      force
     );
-    await this.sessionRepository.remove(s);
+    s.isDelete = 1;
+    await this.sessionRepository.save(s);
     return { message: `Session "${s.libelle}" supprimée` };
   }
 
@@ -201,18 +223,24 @@ export class EvaluationsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createNature(dto: CreateNatureEpreuveDto): Promise<NatureEpreuve> {
-    const exists = await this.natureRepository.findOne({ where: { libelle: dto.libelle } });
+    const exists = await this.natureRepository.findOne({ where: { libelle: dto.libelle,
+        isDelete: 0
+    } });
     if (exists) throw new ConflictException(`La nature "${dto.libelle}" existe déjà`);
     const nature = this.natureRepository.create({ libelle: dto.libelle, description: dto.description });
     return this.natureRepository.save(nature);
   }
 
   async findAllNatures(): Promise<NatureEpreuve[]> {
-    return this.natureRepository.find({ order: { libelle: 'ASC' } });
+    return this.natureRepository.find({
+        where: { isDelete: 0 },
+        order: { libelle: 'ASC' } });
   }
 
   async findNatureById(idNature: number): Promise<NatureEpreuve> {
-    const n = await this.natureRepository.findOne({ where: { idNature } });
+    const n = await this.natureRepository.findOne({ where: { idNature,
+        isDelete: 0
+    } });
     if (!n) throw new NotFoundException(`Nature introuvable (id: ${idNature})`);
     return n;
   }
@@ -224,14 +252,16 @@ export class EvaluationsService {
     return this.natureRepository.save(n);
   }
 
-  async removeNature(idNature: number): Promise<{ message: string }> {
+  async removeNature(idNature: number, force: boolean = false): Promise<{ message: string }> {
     const n = await this.findNatureById(idNature);
     await verifierAvantSuppression(
       this.natureRepository.manager,
       `la nature "${n.libelle}"`,
       [{ entity: Epreuve, where: { nature: { idNature } }, label: (c) => `${c} épreuve(s)` }],
+      force
     );
-    await this.natureRepository.remove(n);
+    n.isDelete = 1;
+    await this.natureRepository.save(n);
     return { message: `Nature "${n.libelle}" supprimée` };
   }
 
@@ -248,7 +278,9 @@ export class EvaluationsService {
       nature,
     });
     if (dto.idPers) {
-      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers,
+          isDelete: 0
+    } });
       if (pers) epreuve.personne = pers;
     }
     return this.epreuveRepository.save(epreuve);
@@ -256,14 +288,17 @@ export class EvaluationsService {
 
   async findAllEpreuves(): Promise<Epreuve[]> {
     return this.epreuveRepository.find({
-      relations: ['nature'],
+        where: { isDelete: 0 },
+        relations: ['nature'],
       order: { libelle: 'ASC' },
     });
   }
 
   async findEpreuveById(idEpreuve: number): Promise<Epreuve> {
     const e = await this.epreuveRepository.findOne({
-      where: { idEpreuve },
+      where: { idEpreuve,
+          isDelete: 0
+    },
       relations: ['nature', 'personne'],
     });
     if (!e) throw new NotFoundException(`Épreuve introuvable (id: ${idEpreuve})`);
@@ -279,14 +314,16 @@ export class EvaluationsService {
     return this.epreuveRepository.save(e);
   }
 
-  async removeEpreuve(idEpreuve: number): Promise<{ message: string }> {
+  async removeEpreuve(idEpreuve: number, force: boolean = false): Promise<{ message: string }> {
     const e = await this.findEpreuveById(idEpreuve);
-    await verifierAvantSuppression(
-      this.epreuveRepository.manager,
-      `l'épreuve "${e.libelle}"`,
-      [{ entity: Evaluation, where: { epreuve: { idEpreuve } }, label: (n) => `${n} note(s)` }],
-    );
-    await this.epreuveRepository.remove(e);
+      await verifierAvantSuppression(
+        this.epreuveRepository.manager,
+        `l'épreuve "${e.libelle}"`,
+        [{ entity: Evaluation, where: { epreuve: { idEpreuve } }, label: (n) => `${n} note(s)` }],
+        force
+      );
+    e.isDelete = 1;
+    await this.epreuveRepository.save(e);
     return { message: `Épreuve "${e.libelle}" supprimée` };
   }
 
@@ -296,11 +333,15 @@ export class EvaluationsService {
 
   async saisirNote(dto: CreateEvaluationDto): Promise<Evaluation> {
     // Vérifier toutes les dépendances
-    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule } });
+    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule,
+        isDelete: 0
+    } });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${dto.matricule})`);
 
     const epreuve = await this.findEpreuveById(dto.idEpreuve);
-    const cours = await this.coursRepository.findOne({ where: { idCours: dto.idCours } });
+    const cours = await this.coursRepository.findOne({ where: { idCours: dto.idCours,
+        isDelete: 0
+    } });
     if (!cours) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
 
     const session = await this.findSessionById(dto.idSession);
@@ -312,7 +353,8 @@ export class EvaluationsService {
         epreuve: { idEpreuve: dto.idEpreuve },
         cours: { idCours: dto.idCours },
         session: { idSession: dto.idSession },
-      },
+          isDelete: 0
+    },
     });
     if (exists) throw new ConflictException('Une note existe déjà pour cet élève sur cette épreuve');
 
@@ -330,10 +372,14 @@ export class EvaluationsService {
     // déterministe sur une personne par défaut pour respecter la contrainte.
     let auteur: Personne | null = null;
     if (dto.idPers) {
-      auteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+      auteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers,
+          isDelete: 0
+    } });
     }
     if (!auteur) {
-      auteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+      auteur = (await this.personneRepository.find({
+          where: { isDelete: 0 },
+        order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
     }
     if (!auteur) {
       throw new NotFoundException(
@@ -347,7 +393,9 @@ export class EvaluationsService {
 
   async findNotesByEleve(matricule: number): Promise<Evaluation[]> {
     return this.evaluationRepository.find({
-      where: { eleve: { matricule } },
+      where: { eleve: { matricule },
+          isDelete: 0
+    },
       relations: ['cours', 'epreuve', 'epreuve.nature', 'session', 'session.trimestre'],
       order: { created_at: 'DESC' },
     });
@@ -355,7 +403,9 @@ export class EvaluationsService {
 
   async findNotesBySession(idSession: number): Promise<Evaluation[]> {
     return this.evaluationRepository.find({
-      where: { session: { idSession } },
+      where: { session: { idSession },
+          isDelete: 0
+    },
       relations: ['eleve', 'cours', 'epreuve'],
       order: { created_at: 'DESC' },
     });
@@ -363,24 +413,31 @@ export class EvaluationsService {
 
   async findNotesByCours(idCours: number): Promise<Evaluation[]> {
     return this.evaluationRepository.find({
-      where: { cours: { idCours } },
+      where: { cours: { idCours },
+          isDelete: 0
+    },
       relations: ['eleve', 'epreuve', 'session'],
       order: { created_at: 'DESC' },
     });
   }
 
   async updateNote(idEval: number, dto: UpdateEvaluationDto): Promise<Evaluation> {
-    const eval_ = await this.evaluationRepository.findOne({ where: { idEval } });
+    const eval_ = await this.evaluationRepository.findOne({ where: { idEval,
+        isDelete: 0
+    } });
     if (!eval_) throw new NotFoundException(`Évaluation introuvable (id: ${idEval})`);
     if (dto.note !== undefined) eval_.note = dto.note;
     if (dto.appreciation !== undefined) eval_.appreciation = dto.appreciation;
     return this.evaluationRepository.save(eval_);
   }
 
-  async removeNote(idEval: number): Promise<{ message: string }> {
-    const eval_ = await this.evaluationRepository.findOne({ where: { idEval } });
+  async removeNote(idEval: number, force: boolean = false): Promise<{ message: string }> {
+    const eval_ = await this.evaluationRepository.findOne({ where: { idEval,
+        isDelete: 0
+    } });
     if (!eval_) throw new NotFoundException(`Évaluation introuvable (id: ${idEval})`);
-    await this.evaluationRepository.remove(eval_);
+    eval_.isDelete = 1;
+    await this.evaluationRepository.save(eval_);
     return { message: `Note id ${idEval} supprimée` };
   }
 
@@ -389,7 +446,9 @@ export class EvaluationsService {
    */
   async calculerMoyenne(matricule: number, idSession: number): Promise<{ moyenne: number; detail: any[] }> {
     const notes = await this.evaluationRepository.find({
-      where: { eleve: { matricule }, session: { idSession } },
+      where: { eleve: { matricule }, session: { idSession },
+          isDelete: 0
+    },
       relations: ['cours'],
     });
 
@@ -418,7 +477,9 @@ export class EvaluationsService {
    */
   async classementSession(idSession: number): Promise<{ idSession: number; effectif: number; classement: any[] }> {
     const notes = await this.evaluationRepository.find({
-      where: { session: { idSession } },
+      where: { session: { idSession },
+          isDelete: 0
+    },
       relations: ['eleve', 'cours'],
     });
 
@@ -464,10 +525,14 @@ export class EvaluationsService {
     dto: CreateRapportDto,
     acteur?: { id: number; role: string },
   ): Promise<Rapport> {
-    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule } });
+    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule,
+        isDelete: 0
+    } });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${dto.matricule})`);
 
-    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca } });
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${dto.idAca})`);
 
     // Auteur : redacteur (idPers) est NOT NULL.
@@ -477,16 +542,24 @@ export class EvaluationsService {
     let redacteur: Personne | null = null;
     let prefixe = '';
     if (acteur?.role === 'personne') {
-      redacteur = await this.personneRepository.findOne({ where: { idPers: acteur.id } });
+      redacteur = await this.personneRepository.findOne({ where: { idPers: acteur.id,
+          isDelete: 0
+    } });
     } else if (dto.idPers && acteur?.role !== 'admin') {
-      redacteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+      redacteur = await this.personneRepository.findOne({ where: { idPers: dto.idPers,
+          isDelete: 0
+    } });
     }
     if (!redacteur && acteur?.role === 'admin') {
-      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id } });
+      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id,
+          isDelete: 0
+    } });
       if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
     }
     if (!redacteur) {
-      redacteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+      redacteur = (await this.personneRepository.find({
+          where: { isDelete: 0 },
+        order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
     }
     if (!redacteur) {
       throw new NotFoundException('Aucune personne en base pour signer le rapport.');
@@ -525,7 +598,9 @@ export class EvaluationsService {
    * Optionnellement filtré par année académique.
    */
   async statsAbsences(idAca?: number): Promise<{ absences: number; retards: number; total: number; faitsTotal: number }> {
-    const rapports = await this.rapportRepository.find({ relations: ['anneeAcademique'] });
+    const rapports = await this.rapportRepository.find({
+        where: { isDelete: 0 },
+        relations: ['anneeAcademique'] });
     const filtres = rapports.filter((r) => !idAca || Number(r.anneeAcademique?.idAnnee) === Number(idAca));
     const norm = (s?: string) => (s || '').toLowerCase();
     const absences = filtres.filter((r) => norm(r.libelle).includes('absence')).length;
@@ -535,7 +610,9 @@ export class EvaluationsService {
 
   async findRapportsByEleve(matricule: number): Promise<Rapport[]> {
     return this.rapportRepository.find({
-      where: { eleve: { matricule } },
+      where: { eleve: { matricule },
+          isDelete: 0
+    },
       relations: ['anneeAcademique', 'redacteur'],
       order: { created_at: 'DESC' },
     });
@@ -543,7 +620,9 @@ export class EvaluationsService {
 
   async findRapportById(idRap: number): Promise<Rapport> {
     const r = await this.rapportRepository.findOne({
-      where: { idRap },
+      where: { idRap,
+          isDelete: 0
+    },
       relations: ['eleve', 'anneeAcademique', 'redacteur'],
     });
     if (!r) throw new NotFoundException(`Rapport introuvable (id: ${idRap})`);
@@ -559,9 +638,10 @@ export class EvaluationsService {
     return this.rapportRepository.save(r);
   }
 
-  async removeRapport(idRap: number): Promise<{ message: string }> {
+  async removeRapport(idRap: number, force: boolean = false): Promise<{ message: string }> {
     const r = await this.findRapportById(idRap);
-    await this.rapportRepository.remove(r);
+    r.isDelete = 1;
+    await this.rapportRepository.save(r);
     return { message: `Rapport id ${idRap} supprimé` };
   }
 }

@@ -12,6 +12,9 @@ import { Personne } from './personne.entity';
  */
 @Entity('session')
 export class Session {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idSession: number;
 

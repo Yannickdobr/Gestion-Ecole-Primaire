@@ -7,7 +7,6 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Admin } from './admin.entity';
-import { Classe } from './classe.entity';
 import { Livres } from './livres.entity';
 
 /**
@@ -16,6 +15,9 @@ import { Livres } from './livres.entity';
  */
 @Entity('cours')
 export class Cours {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idCours: number;
 
@@ -39,9 +41,6 @@ export class Cours {
 
   // ─── Relations ────────────────────────────────────────────────────────
 
-  @ManyToOne(() => Classe, { eager: true, nullable: false })
-  @JoinColumn({ name: 'idClasse' })
-  classe: Classe;
 
   // Livre associé au cours (FK idLivre). Nullable : pas toujours renseigné.
   @ManyToOne(() => Livres, { eager: true, nullable: true })

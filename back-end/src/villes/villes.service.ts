@@ -13,13 +13,17 @@ export class VillesService {
 
   /** Toutes les villes (référentiel) */
   findAll(): Promise<VilleNaissance[]> {
-    return this.villeRepository.find({ order: { libelle: 'ASC' } });
+    return this.villeRepository.find({
+        where: { isDelete: 0 },
+        order: { libelle: 'ASC' } });
   }
 
   /** Villes actives uniquement */
   findActives(): Promise<VilleNaissance[]> {
     return this.villeRepository.find({
-      where: { actif: 1 },
+      where: { actif: 1,
+          isDelete: 0
+    },
       order: { libelle: 'ASC' },
     });
   }

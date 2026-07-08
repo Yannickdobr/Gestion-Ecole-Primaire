@@ -12,6 +12,9 @@ import { Livres } from './livres.entity';
  */
 @Entity('specialite')
 export class Specialite {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idSpecialite: number;
 

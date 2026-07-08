@@ -64,9 +64,7 @@ export class ProfesseursController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer un compte personnel (réservé à la direction)' })
-  removePersonne(@Param('id', ParseIntPipe) id: number) {
-    return this.professeursService.removePersonne(id);
-  }
+  removePersonne(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.professeursService.removePersonne(id, force === 'true'); }
 
   // ── Enseignants ───────────────────────────────────────────────────────────
   @Post('enseignants')
@@ -108,7 +106,7 @@ export class ProfesseursController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer un enseignant' })
-  removeEnseignant(@Param('id', ParseIntPipe) id: number) { return this.professeursService.removeEnseignant(id); }
+  removeEnseignant(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.professeursService.removeEnseignant(id, force === 'true'); }
 
   // ── Titulaires ────────────────────────────────────────────────────────────
   @Post('titulaires')
@@ -141,5 +139,5 @@ export class ProfesseursController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ManagerGuard)
   @ApiOperation({ summary: 'Supprimer un titulaire' })
-  removeTitulaire(@Param('id', ParseIntPipe) id: number) { return this.professeursService.removeTitulaire(id); }
+  removeTitulaire(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.professeursService.removeTitulaire(id, force === 'true'); }
 }

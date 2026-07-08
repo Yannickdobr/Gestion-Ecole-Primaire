@@ -12,6 +12,9 @@ import { Parents } from './parents.entity';
  */
 @Entity('messages')
 export class Messages {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idMessages: number;
 

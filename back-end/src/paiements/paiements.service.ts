@@ -63,7 +63,9 @@ export class PaiementsService {
    * (in-app + email) les parents de ceux ayant un solde dû.
    */
   async envoyerRappelsImpayes(idAca: number, acteur?: { id: number; role: string }) {
-    const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca } });
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${idAca})`);
 
     // Auteur : Personne -> expéditeur réel ; Admin -> signature "[Par <nom>]".
@@ -72,11 +74,15 @@ export class PaiementsService {
     if (acteur?.role === 'personne') {
       expediteurId = acteur.id;
     } else if (acteur?.role === 'admin') {
-      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id } });
+      const adm = await this.adminRepository.findOne({ where: { ID: acteur.id,
+          isDelete: 0
+    } });
       if (adm?.nom) prefixe = `[Par ${adm.nom}]`;
     }
 
-    const eleves = await this.eleveRepository.find({ where: { actif: 1 } });
+    const eleves = await this.eleveRepository.find({ where: { actif: 1,
+        isDelete: 0
+    } });
     let elevesEnRetard = 0;
     const details: any[] = [];
 
@@ -112,7 +118,9 @@ export class PaiementsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createMode(dto: CreateModeDto): Promise<Mode> {
-    const exists = await this.modeRepository.findOne({ where: { libelle: dto.libelle } });
+    const exists = await this.modeRepository.findOne({ where: { libelle: dto.libelle,
+        isDelete: 0
+    } });
     if (exists) throw new ConflictException(`Le mode "${dto.libelle}" existe déjà`);
 
     // Valeurs par défaut pour les colonnes NOT NULL non renseignées
@@ -126,11 +134,15 @@ export class PaiementsService {
   }
 
   async findAllModes(): Promise<Mode[]> {
-    return this.modeRepository.find({ where: { actif: 1 }, order: { libelle: 'ASC' } });
+    return this.modeRepository.find({ where: { actif: 1,
+        isDelete: 0
+    }, order: { libelle: 'ASC' } });
   }
 
   async findModeById(idMode: number): Promise<Mode> {
-    const mode = await this.modeRepository.findOne({ where: { idMode } });
+    const mode = await this.modeRepository.findOne({ where: { idMode,
+        isDelete: 0
+    } });
     if (!mode) throw new NotFoundException(`Mode de paiement introuvable (id: ${idMode})`);
     return mode;
   }
@@ -143,14 +155,16 @@ export class PaiementsService {
     return this.modeRepository.save(mode);
   }
 
-  async removeMode(idMode: number): Promise<{ message: string }> {
+  async removeMode(idMode: number, force: boolean = false): Promise<{ message: string }> {
     const mode = await this.findModeById(idMode);
     await verifierAvantSuppression(
       this.modeRepository.manager,
       `le mode "${mode.libelle}"`,
       [{ entity: Paiement, where: { mode: { idMode } }, label: (n) => `${n} paiement(s)` }],
+      force
     );
-    await this.modeRepository.remove(mode);
+    mode.isDelete = 1;
+    await this.modeRepository.save(mode);
     return { message: `Mode "${mode.libelle}" supprimé` };
   }
 
@@ -159,7 +173,9 @@ export class PaiementsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createScolarite(dto: CreateScolariteDto): Promise<Scolarite> {
-    const cycle = await this.cycleRepository.findOne({ where: { idCycle: dto.idCycle } });
+    const cycle = await this.cycleRepository.findOne({ where: { idCycle: dto.idCycle,
+        isDelete: 0
+    } });
     if (!cycle) throw new NotFoundException(`Cycle introuvable (id: ${dto.idCycle})`);
 
     const scolarite = this.scolariteRepository.create({
@@ -176,14 +192,17 @@ export class PaiementsService {
 
   async findAllScolarites(): Promise<Scolarite[]> {
     return this.scolariteRepository.find({
-      relations: ['cycle', 'tranches'],
+        where: { isDelete: 0 },
+        relations: ['cycle', 'tranches'],
       order: { created_at: 'DESC' },
     });
   }
 
   async findScolariteByCycle(idCycle: number): Promise<Scolarite> {
     const s = await this.scolariteRepository.findOne({
-      where: { cycle: { idCycle } },
+      where: { cycle: { idCycle },
+          isDelete: 0
+    },
       relations: ['cycle', 'tranches'],
     });
     if (!s) throw new NotFoundException(`Scolarité non définie pour ce cycle (id: ${idCycle})`);
@@ -192,7 +211,9 @@ export class PaiementsService {
 
   async findScolariteById(idScolarite: number): Promise<Scolarite> {
     const s = await this.scolariteRepository.findOne({
-      where: { idScolarite },
+      where: { idScolarite,
+          isDelete: 0
+    },
       relations: ['cycle', 'tranches'],
     });
     if (!s) throw new NotFoundException(`Scolarité introuvable (id: ${idScolarite})`);
@@ -206,21 +227,25 @@ export class PaiementsService {
     if (dto.nbreTranche !== undefined) s.nbreTranche = dto.nbreTranche;
     if (dto.description !== undefined) s.description = dto.description;
     if (dto.idCycle !== undefined) {
-      const cycle = await this.cycleRepository.findOne({ where: { idCycle: dto.idCycle } });
+      const cycle = await this.cycleRepository.findOne({ where: { idCycle: dto.idCycle,
+          isDelete: 0
+    } });
       if (!cycle) throw new NotFoundException(`Cycle introuvable (id: ${dto.idCycle})`);
       s.cycle = cycle;
     }
     return this.scolariteRepository.save(s);
   }
 
-  async removeScolarite(idScolarite: number): Promise<{ message: string }> {
+  async removeScolarite(idScolarite: number, force: boolean = false): Promise<{ message: string }> {
     const s = await this.findScolariteById(idScolarite);
     await verifierAvantSuppression(
       this.scolariteRepository.manager,
       `cette scolarité`,
       [{ entity: Tranches, where: { scolarite: { idScolarite } }, label: (n) => `${n} tranche(s)` }],
+      force
     );
-    await this.scolariteRepository.remove(s);
+    s.isDelete = 1;
+    await this.scolariteRepository.save(s);
     return { message: `Scolarité id ${idScolarite} supprimée` };
   }
 
@@ -245,14 +270,18 @@ export class PaiementsService {
 
   async findTranchesByScolarite(idScolarite: number): Promise<Tranches[]> {
     return this.trancheRepository.find({
-      where: { scolarite: { idScolarite } },
+      where: { scolarite: { idScolarite },
+          isDelete: 0
+    },
       order: { delai_mois: 'ASC' },
     });
   }
 
   async findTrancheById(idTranche: number): Promise<Tranches> {
     const t = await this.trancheRepository.findOne({
-      where: { idTranche },
+      where: { idTranche,
+          isDelete: 0
+    },
       relations: ['scolarite'],
     });
     if (!t) throw new NotFoundException(`Tranche introuvable (id: ${idTranche})`);
@@ -269,9 +298,10 @@ export class PaiementsService {
     return this.trancheRepository.save(t);
   }
 
-  async removeTranche(idTranche: number): Promise<{ message: string }> {
+  async removeTranche(idTranche: number, force: boolean = false): Promise<{ message: string }> {
     const t = await this.findTrancheById(idTranche);
-    await this.trancheRepository.remove(t);
+    t.isDelete = 1;
+    await this.trancheRepository.save(t);
     return { message: `Tranche "${t.libelle}" supprimée` };
   }
 
@@ -280,10 +310,14 @@ export class PaiementsService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async enregistrerPaiement(dto: CreatePaiementDto): Promise<Paiement> {
-    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule } });
+    const eleve = await this.eleveRepository.findOne({ where: { matricule: dto.matricule,
+        isDelete: 0
+    } });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${dto.matricule})`);
 
-    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca } });
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: dto.idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${dto.idAca})`);
 
     const mode = await this.findModeById(dto.idMode);
@@ -300,7 +334,9 @@ export class PaiementsService {
     });
 
     if (dto.idPers) {
-      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers } });
+      const pers = await this.personneRepository.findOne({ where: { idPers: dto.idPers,
+          isDelete: 0
+    } });
       if (pers) paiement.enregistrePar = pers;
     }
 
@@ -309,7 +345,9 @@ export class PaiementsService {
 
   async findPaiementsByEleve(matricule: number): Promise<Paiement[]> {
     return this.paiementRepository.find({
-      where: { eleve: { matricule } },
+      where: { eleve: { matricule },
+          isDelete: 0
+    },
       relations: ['mode', 'anneeAcademique'],
       order: { datePaie: 'DESC' },
     });
@@ -317,7 +355,9 @@ export class PaiementsService {
 
   async findPaiementsByAnnee(idAca: number): Promise<Paiement[]> {
     return this.paiementRepository.find({
-      where: { anneeAcademique: { idAnnee: idAca } },
+      where: { anneeAcademique: { idAnnee: idAca },
+          isDelete: 0
+    },
       relations: ['eleve', 'mode'],
       order: { datePaie: 'DESC' },
     });
@@ -325,7 +365,9 @@ export class PaiementsService {
 
   async findPaiementById(idPaie: number): Promise<Paiement> {
     const p = await this.paiementRepository.findOne({
-      where: { idPaie },
+      where: { idPaie,
+          isDelete: 0
+    },
       relations: ['eleve', 'mode', 'anneeAcademique', 'enregistrePar'],
     });
     if (!p) throw new NotFoundException(`Paiement introuvable (id: ${idPaie})`);
@@ -343,9 +385,10 @@ export class PaiementsService {
     return this.paiementRepository.save(p);
   }
 
-  async removePaiement(idPaie: number): Promise<{ message: string }> {
+  async removePaiement(idPaie: number, force: boolean = false): Promise<{ message: string }> {
     const p = await this.findPaiementById(idPaie);
-    await this.paiementRepository.remove(p);
+    p.isDelete = 1;
+    await this.paiementRepository.save(p);
     return { message: `Paiement id ${idPaie} supprimé` };
   }
 
@@ -362,7 +405,9 @@ export class PaiementsService {
   async calculerArrieres(matricule: number, idAca: number): Promise<any> {
     // On charge l'élève avec ses affectations (Frequente) pour déduire son cycle
     const eleve = await this.eleveRepository.findOne({
-      where: { matricule },
+      where: { matricule,
+          isDelete: 0
+    },
       relations: [
         'frequentations',
         'frequentations.anneeAcademique',
@@ -373,11 +418,15 @@ export class PaiementsService {
     });
     if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${matricule})`);
 
-    const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca } });
+    const annee = await this.anneeRepository.findOne({ where: { idAnnee: idAca,
+        isDelete: 0
+    } });
     if (!annee) throw new NotFoundException(`Année académique introuvable (id: ${idAca})`);
 
     const paiements = await this.paiementRepository.find({
-      where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca } },
+      where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca },
+          isDelete: 0
+    },
       relations: ['mode'],
       order: { datePaie: 'ASC' },
     });
@@ -394,7 +443,9 @@ export class PaiementsService {
     let scolarite: Scolarite | null = null;
     if (cycle) {
       scolarite = await this.scolariteRepository.findOne({
-        where: { cycle: { idCycle: cycle.idCycle } },
+        where: { cycle: { idCycle: cycle.idCycle },
+            isDelete: 0
+        },
         relations: ['tranches', 'cycle'],
       });
     }
@@ -442,7 +493,9 @@ export class PaiementsService {
     const scolarite = await this.findScolariteByCycle(idCycle);
 
     const paiements = await this.paiementRepository.find({
-      where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca } },
+      where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca },
+          isDelete: 0
+    },
     });
 
     const totalDu = scolarite.inscription + scolarite.pension;

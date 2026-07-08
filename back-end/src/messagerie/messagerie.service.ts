@@ -35,11 +35,15 @@ export class MessagerieService {
     if (user.role !== 'personne') {
       throw new ForbiddenException("Seul un compte Personne (enseignant, scolarité…) peut envoyer un message.");
     }
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id } });
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id,
+        isDelete: 0
+    } });
     if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
 
     const destinataire = await this.parentsRepository.findOne({
-      where: { idParent: dto.idParent }, relations: ['personne'],
+      where: { idParent: dto.idParent,
+          isDelete: 0
+    }, relations: ['personne'],
     });
     if (!destinataire) throw new NotFoundException(`Parent introuvable (idParent: ${dto.idParent})`);
 
@@ -60,7 +64,9 @@ export class MessagerieService {
     if (user.role !== 'personne') {
       throw new ForbiddenException("Seul un compte Personne peut envoyer un message.");
     }
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id } });
+    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id,
+        isDelete: 0
+    } });
     if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
 
     let envoyes = 0;
@@ -68,7 +74,9 @@ export class MessagerieService {
 
     for (const idParent of dto.idParents) {
       const destinataire = await this.parentsRepository.findOne({
-        where: { idParent }, relations: ['personne'],
+        where: { idParent,
+            isDelete: 0
+        }, relations: ['personne'],
       });
       if (!destinataire) { erreurs.push(`Parent id ${idParent} introuvable`); continue; }
 
@@ -108,14 +116,18 @@ export class MessagerieService {
     let expediteur: Personne | null = null;
     let prefixe = '';
     if (acteur?.role === 'personne') {
-      expediteur = await this.personneRepository.findOne({ where: { idPers: acteur.id } });
+      expediteur = await this.personneRepository.findOne({ where: { idPers: acteur.id,
+          isDelete: 0
+    } });
     }
     if (!expediteur && acteur?.role === 'admin') {
       const adm = await manager.findOne(Admin, { where: { ID: acteur.id } });
       if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
     }
     if (!expediteur) {
-      expediteur = (await this.personneRepository.find({ order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+      expediteur = (await this.personneRepository.find({
+          where: { isDelete: 0 },
+        order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
     }
     if (!expediteur) throw new NotFoundException('Aucune personne en base pour signer la convocation.');
 
@@ -125,7 +137,9 @@ export class MessagerieService {
     if (matricules.length === 0) return { envoyes: 0, parents: 0 };
 
     const liens = await this.parentsRepository.find({
-      where: { eleve: { matricule: In(matricules) } },
+      where: { eleve: { matricule: In(matricules) },
+          isDelete: 0
+    },
       relations: ['personne', 'eleve'],
     });
 
@@ -153,14 +167,17 @@ export class MessagerieService {
 
   async findAll(): Promise<Messages[]> {
     return this.messagesRepository.find({
-      relations: ['expediteur', 'destinataire', 'destinataire.personne'],
+        where: { isDelete: 0 },
+        relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
   }
 
   async findEnvoyes(): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { valider: 1 },
+      where: { valider: 1,
+          isDelete: 0
+    },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
@@ -168,7 +185,9 @@ export class MessagerieService {
 
   async findBrouillons(): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { valider: 0 },
+      where: { valider: 0,
+          isDelete: 0
+    },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
@@ -176,7 +195,9 @@ export class MessagerieService {
 
   async findByParent(idParent: number): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { destinataire: { idParent }, valider: 1 },
+      where: { destinataire: { idParent }, valider: 1,
+          isDelete: 0
+    },
       relations: ['expediteur'],
       order: { created_at: 'DESC' },
     });
@@ -192,12 +213,16 @@ export class MessagerieService {
     if (user?.role === 'admin') return this.findAll();
 
     const lignesParent = await this.parentsRepository.find({
-      where: { personne: { idPers: user.id } },
+      where: { personne: { idPers: user.id },
+          isDelete: 0
+    },
     });
     if (lignesParent.length > 0) {
       const ids = lignesParent.map((p) => p.idParent);
       return this.messagesRepository.find({
-        where: { destinataire: { idParent: In(ids) }, valider: 1 },
+        where: { destinataire: { idParent: In(ids) }, valider: 1,
+            isDelete: 0
+        },
         relations: ['expediteur', 'destinataire', 'destinataire.personne'],
         order: { created_at: 'DESC' },
       });
@@ -207,7 +232,9 @@ export class MessagerieService {
 
   async findByExpediteur(idPers: number): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { expediteur: { idPers } },
+      where: { expediteur: { idPers },
+          isDelete: 0
+    },
       relations: ['destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
@@ -215,7 +242,9 @@ export class MessagerieService {
 
   async findByType(type: number): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { type_message: type },
+      where: { type_message: type,
+          isDelete: 0
+    },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
@@ -223,7 +252,9 @@ export class MessagerieService {
 
   async findByAnnee(annee: string): Promise<Messages[]> {
     return this.messagesRepository.find({
-      where: { AnneeAcade: annee },
+      where: { AnneeAcade: annee,
+          isDelete: 0
+    },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
     });
@@ -231,7 +262,9 @@ export class MessagerieService {
 
   async findById(idMessages: number): Promise<Messages> {
     const msg = await this.messagesRepository.findOne({
-      where: { idMessages },
+      where: { idMessages,
+          isDelete: 0
+    },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
     });
     if (!msg) throw new NotFoundException(`Message introuvable (id: ${idMessages})`);
@@ -264,15 +297,16 @@ export class MessagerieService {
     return { message: `Message id ${idMessages} archivé` };
   }
 
-  async removeMessage(idMessages: number): Promise<{ message: string }> {
+  async removeMessage(idMessages: number, force: boolean = false): Promise<{ message: string }> {
     const msg = await this.findById(idMessages);
     if (msg.valider === 1) throw new BadRequestException('Impossible de supprimer un message envoyé.');
-    await this.messagesRepository.remove(msg);
+    msg.isDelete = 1;
+    await this.messagesRepository.save(msg);
     return { message: `Message id ${idMessages} supprimé` };
   }
 
   async getStats(): Promise<{ total: number; envoyes: number; brouillons: number; archives: number }> {
-    const tous = await this.messagesRepository.find();
+    const tous = await this.messagesRepository.find({ where: { isDelete: 0 } });
     return {
       total: tous.length,
       envoyes: tous.filter(m => m.valider === 1).length,

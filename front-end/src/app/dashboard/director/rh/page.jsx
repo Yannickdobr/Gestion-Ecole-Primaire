@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
-import { getEnseignants, getAnnees, getFichesEnseignant, createFicheEnseignant, deleteFicheEnseignant, getCoursParClasse, setMatiereDifficulte, getTitulaires } from "@/lib/api";
+import { getEnseignants, getAnnees, getFichesEnseignant, createFicheEnseignant, deleteFicheEnseignant, getCours, setMatiereDifficulte, getTitulaires } from "@/lib/api";
 import { ClipboardList, Plus, Trash2, Repeat } from "lucide-react";
 
 const inputStyle = { width: "100%", padding: "10px 13px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
@@ -53,7 +53,7 @@ export default function RhPage() {
     setDifficulteSel(ens?.cours?.idCours ? String(ens.cours.idCours) : "");
     const classe = classeDeEns(ens);
     if (classe?.idClasse) {
-      try { const cc = await getCoursParClasse(classe.idClasse); setCoursClasse(Array.isArray(cc) ? cc : []); }
+      try { const cc = await getCours(); setCoursClasse(Array.isArray(cc) ? cc : []); }
       catch { setCoursClasse([]); }
     }
   };

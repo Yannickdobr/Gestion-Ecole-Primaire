@@ -8,6 +8,9 @@ import { Cours } from './cours.entity';
 
 @Entity('enseignant')
 export class Enseignant {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idEnseignant: number;
 

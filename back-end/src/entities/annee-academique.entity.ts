@@ -14,6 +14,9 @@ import {
    */
   @Entity('anneeacademique')
   export class AnneeAcademique {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
     @PrimaryGeneratedColumn({ type: 'int' })
     idAnnee: number;
   

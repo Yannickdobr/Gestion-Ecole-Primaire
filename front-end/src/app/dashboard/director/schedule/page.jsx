@@ -10,16 +10,18 @@ import {
 import {
   MdOutlineClass, MdOutlineMeetingRoom,
 } from 'react-icons/md';
-import { BsPersonFill, BsCalendar3 } from 'react-icons/bs';
+import { BsPersonFill, BsCalendar3, BsPlus } from 'react-icons/bs';
+import { Repeat } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useActiveYear } from '@/context/ActiveYearContext';
 import {
   getClasses, getEnseignants, getSalles, getCours, getEmploi,
-  createEmploi, deleteEmploi, verifierConflitsEmploi, getTitulaires,
+  createEmploi, deleteEmploi, verifierConflitsEmploi, getTitulaires, getPlanInterim
 } from '@/lib/api';
 import { imprimerEmploi } from '@/lib/print';
 import { exporterCSV } from '@/lib/export';
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 // Créneaux horaires sélectionnables (hors pauses)
 const HEURES_CRENEAUX = ['08:00', '09:30', '11:15', '14:00', '15:30'];
@@ -53,7 +55,8 @@ const adaptClasses = (rows = []) =>
 const adaptEnseignants = (rows = []) =>
   rows.map((e, i) => ({
     idPers: e.personne?.idPers,
-    idClasse: e.classe?.idClasse, // pour filtrer l'EDT (un créneau ne stocke pas l'enseignant)
+    idEnseignant: e.idEnseignant,
+    idClasse: e.classe?.idClasse,
     nom: e.personne?.nom || '',
     prenom: e.personne?.prenom || '',
     initiales: initialesDe(e.personne?.prenom, e.personne?.nom),
@@ -116,11 +119,6 @@ function timeToMins(heure) {
   const [h, m] = heure.split(':').map(Number);
   return h * 60 + m;
 }
-
-// ── Lookup helpers ────────────────────────────────────────
-// Les tables de correspondance (classeMap, coursMap...) sont désormais
-// construites à partir des données API dans le composant principal et
-// passées aux sous-composants via la prop `lookups`.
 
 // ── Sub-components ────────────────────────────────────────
 
@@ -223,6 +221,7 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
   const isConflict = slot.status === 'conflit';
   const isAnnule = slot.status === 'annule';
   const isExamen = slot.status === 'examen';
+  const isInterim = slot.swapRole === 'B';
 
   return (
     <div
@@ -230,11 +229,11 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
-        background: isAnnule
+        background: isInterim ? 'rgba(79,103,255,0.12)' : isAnnule
           ? 'repeating-linear-gradient(135deg,rgba(138,112,96,0.05),rgba(138,112,96,0.05) 4px,transparent 4px,transparent 8px)'
           : meta.bg,
-        border: `1.5px ${isConflict ? 'dashed' : 'solid'} ${meta.border}`,
-        borderLeft: `4px solid ${isConflict ? '#ef4444' : subjectColor}`,
+        border: `1.5px ${isConflict ? 'dashed' : 'solid'} ${isInterim ? 'rgba(79,103,255,0.35)' : meta.border}`,
+        borderLeft: `4px solid ${isConflict ? '#ef4444' : isInterim ? '#4f67ff' : subjectColor}`,
         borderRadius: 10,
         padding: '8px 10px',
         cursor: 'pointer',
@@ -267,45 +266,35 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
         </div>
       )}
 
-      {/* Subject name */}
-      <div style={{
-        fontSize: 12.5, fontWeight: 700, color: isAnnule ? '#8a7060' : '#1a1208',
-        lineHeight: 1.25, marginBottom: 4,
-        textDecoration: isAnnule ? 'line-through' : 'none',
-        paddingRight: isConflict || isExamen ? 20 : 0,
-      }}>
-        {cours?.libelle}
-      </div>
-
-      {/* Context sub-data */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {viewMode !== 'teacher' && enseignant && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{
-              width: 16, height: 16, borderRadius: '50%',
-              background: `linear-gradient(135deg,${enseignant.couleur}bb,${enseignant.couleur})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 7, fontWeight: 700, color: 'white', flexShrink: 0,
-            }}>
-              {enseignant.initiales}
+      {/* Main Block Content */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontSize: 13, fontWeight: 700, color: isInterim ? '#3a4bd6' : isAnnule ? '#8a7060' : '#1a1208',
+            lineHeight: 1.2, marginBottom: 4, fontFamily: "'Playfair Display',serif",
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            textDecoration: isAnnule ? 'line-through' : 'none',
+          }}>
+            {isInterim ? slot.matiere : (cours?.libelle || t.no_subject)}
+          </div>
+          
+          {isInterim ? (
+            <div style={{ fontSize: 10.5, color: "#4f67ff", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+              <Repeat size={11} /> intérim · classe {slot.targetClasse}
             </div>
-            <span style={{ fontSize: 10.5, color: '#4a3728', fontWeight: 500, lineHeight: 1.2 }}>
-              {enseignant.prenom} {enseignant.nom}
-            </span>
-          </div>
-        )}
-        {viewMode !== 'class' && classe && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <MdOutlineClass style={{ fontSize: 11, color: '#8a7060', flexShrink: 0 }} />
-            <span style={{ fontSize: 10.5, color: '#4a3728', fontWeight: 500 }}>{classe.libelle}</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <FiMapPin style={{ fontSize: 10, color: '#8a7060', flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: '#8a7060' }}>{salle?.libelle}</span>
-          <span style={{ fontSize: 10, color: '#8a7060', marginLeft: 4 }}>
-            · {slot.heure}–{endTime}
-          </span>
+          ) : (
+            <div style={{ fontSize: 11, color: '#8a7060', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {viewMode !== 'class' && classe && <span>Classe {classe.libelle}</span>}
+              {viewMode !== 'class' && viewMode !== 'room' && salle && <span>({salle.libelle})</span>}
+              {viewMode !== 'teacher' && enseignant && <span>{enseignant.prenom} {enseignant.nom}</span>}
+            </div>
+          )}
+        </div>
+        
+        {/* Timing bottom */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+          <FiMapPin style={{ fontSize: 10, color: '#8a7060' }} />
+          <span style={{ fontSize: 10, color: '#8a7060' }}>{salle?.libelle || '...'} · {slot.heure}–{endTime}</span>
         </div>
       </div>
 
@@ -350,8 +339,7 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
 
 // ── Desktop grid ─────────────────────────────────────────
 function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
-  // Time axis: fixed row heights proportional to minutes
-  const CELL_HEIGHT = 64; // px per slot row
+  const CELL_HEIGHT = 64; 
 
   const timeRows = [
     { label: '08:00', mins: 480, isBreak: false },
@@ -371,13 +359,12 @@ function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       <div style={{ minWidth: 860 }}>
-        {/* Day headers */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '64px repeat(6, 1fr)',
           gap: 6, marginBottom: 6,
         }}>
-          <div /> {/* time axis spacer */}
+          <div /> 
           {JOURS.map(jour => (
             <div key={jour} style={{
               textAlign: 'center', padding: '8px 4px', borderRadius: 10,
@@ -391,7 +378,6 @@ function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
           ))}
         </div>
 
-        {/* Rows */}
         {timeRows.map((row, ri) => {
           if (row.isBreak) {
             return (
@@ -421,7 +407,6 @@ function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
               gap: 6, marginBottom: 4,
               minHeight: rowH,
             }}>
-              {/* Time label */}
               <div style={{
                 display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
                 paddingRight: 8, paddingTop: 4,
@@ -429,7 +414,6 @@ function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
                 <span style={{ fontSize: 10, color: '#8a7060', fontWeight: 600 }}>{row.label}</span>
               </div>
 
-              {/* Day cells */}
               {JOURS.map(jour => {
                 const blocks = filteredSlots.filter(
                   s => s.jour === jour && s.heure === row.label
@@ -446,7 +430,7 @@ function DesktopGrid({ filteredSlots, viewMode, t, lookups, onDelete }) {
                   }}>
                     {blocks.length === 0 ? null : (
                       blocks.map(slot => (
-                        <CourseBlock key={slot.idTemps} slot={slot} viewMode={viewMode} t={t} lookups={lookups} onDelete={onDelete} />
+                        <CourseBlock key={slot.idTemps || `${slot.jour}-${slot.heure}-${slot.idCours}`} slot={slot} viewMode={viewMode} t={t} lookups={lookups} onDelete={onDelete} />
                       ))
                     )}
                     {blocks.length === 0 && (
@@ -487,7 +471,6 @@ function MobileView({ filteredSlots, selectedDay, setSelectedDay, viewMode, t, l
 
   return (
     <div>
-      {/* Day selector */}
       <div style={{
         display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 16,
       }}>
@@ -525,7 +508,6 @@ function MobileView({ filteredSlots, selectedDay, setSelectedDay, viewMode, t, l
         })}
       </div>
 
-      {/* Timeline */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {allSlotTimes.map(time => {
           if (breaks[time]) {
@@ -538,7 +520,7 @@ function MobileView({ filteredSlots, selectedDay, setSelectedDay, viewMode, t, l
               <span style={{ fontSize: 10, fontWeight: 600, color: '#8a7060', width: 40, paddingTop: 10, flexShrink: 0 }}>{time}</span>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {slots.map(slot => (
-                  <CourseBlock key={slot.idTemps} slot={slot} viewMode={viewMode} t={t} lookups={lookups} onDelete={onDelete} />
+                  <CourseBlock key={slot.idTemps || `${slot.jour}-${slot.heure}-${slot.idCours}`} slot={slot} viewMode={viewMode} t={t} lookups={lookups} onDelete={onDelete} />
                 ))}
               </div>
             </div>
@@ -563,33 +545,33 @@ export default function SchedulePage() {
   const { user } = useAuth();
   const { anneeId, anneeLibelle } = useActiveYear();
 
-  const [viewMode, setViewMode] = useState('class');    // 'class' | 'teacher' | 'room'
+  const [viewMode, setViewMode] = useState('class');
   const [selectedFilter, setSelectedFilter] = useState('');
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState('Lundi');
   const [isMobile, setIsMobile] = useState(false);
 
-  // Données chargées depuis l'API
   const [classes, setClasses] = useState([]);
   const [enseignants, setEnseignants] = useState([]);
   const [salles, setSalles] = useState([]);
   const [cours, setCours] = useState([]);
   const [emploi, setEmploi] = useState([]);
   const [titulaires, setTitulaires] = useState([]);
+  const [plan, setPlan] = useState([]);
   const [error, setError] = useState('');
 
-  // Édition : modal d'ajout de créneau
   const [addOuvert, setAddOuvert] = useState(false);
   const [creneauForm, setCreneauForm] = useState({ idClasse: '', idCours: '', jour: 'Lundi', heure: '08:00' });
   const [envoiCreneau, setEnvoiCreneau] = useState(false);
   const [creneauErreur, setCreneauErreur] = useState('');
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, impact: [], message: "" });
 
   useEffect(() => {
     let actif = true;
     (async () => {
       try {
-        const [c, e, s, co, em, tits] = await Promise.all([
-          getClasses(), getEnseignants(), getSalles(), getCours(), getEmploi(), getTitulaires().catch(() => []),
+        const [c, e, s, co, em, tits, pl] = await Promise.all([
+          getClasses(), getEnseignants(), getSalles(), getCours(), getEmploi(), getTitulaires().catch(() => []), getPlanInterim().catch(() => [])
         ]);
         if (!actif) return;
         setClasses(adaptClasses(c));
@@ -598,6 +580,7 @@ export default function SchedulePage() {
         setCours(adaptCours(co));
         setEmploi(adaptEmploi(em));
         setTitulaires(Array.isArray(tits) ? tits : []);
+        setPlan(Array.isArray(pl) ? pl : []);
       } catch (err) {
         if (actif) setError(err.message || "Erreur de chargement de l'emploi du temps.");
       }
@@ -605,7 +588,6 @@ export default function SchedulePage() {
     return () => { actif = false; };
   }, []);
 
-  // Tables de correspondance pour les sous-composants
   const lookups = useMemo(() => ({
     classeMap: Object.fromEntries(classes.map(c => [c.idClasse, c])),
     enseignMap: Object.fromEntries(enseignants.map(e => [e.idPers, e])),
@@ -613,7 +595,6 @@ export default function SchedulePage() {
     coursMap: Object.fromEntries(cours.map(c => [c.idCours, c])),
   }), [classes, enseignants, salles, cours]);
 
-  // Recharge uniquement les créneaux (après ajout/suppression)
   const rechargerEmploi = async () => {
     try {
       const em = await getEmploi();
@@ -623,19 +604,26 @@ export default function SchedulePage() {
     }
   };
 
-  // Supprimer un créneau
-  const supprimerCreneau = async (slot) => {
-    if (typeof window !== 'undefined' && !window.confirm('Supprimer ce créneau ?')) return;
+  const supprimerCreneau = (slot) => {
+    setDeleteModal({ isOpen: true, item: slot, impact: [], message: "Voulez-vous vraiment supprimer ce créneau ?" });
+  };
+
+  const executeDelete = async () => {
+    const { item } = deleteModal;
     setError('');
     try {
-      await deleteEmploi(slot.idTemps);
+      await deleteEmploi(item.idTemps);
+      setDeleteModal({ isOpen: false, item: null, impact: [], message: "" });
       await rechargerEmploi();
     } catch (err) {
-      setError(err.message || 'Suppression impossible.');
+      if (err.requireConfirmation) {
+         setDeleteModal({ ...deleteModal, impact: err.impact, message: err.message });
+      } else {
+         setError(err.message || 'Suppression impossible.');
+      }
     }
   };
 
-  // Ajouter un créneau (avec détection de conflits)
   const ajouterCreneau = async (ev) => {
     ev.preventDefault();
     setCreneauErreur('');
@@ -653,13 +641,11 @@ export default function SchedulePage() {
     };
     setEnvoiCreneau(true);
     try {
-      // 1) Vérifier les conflits côté serveur
       const res = await verifierConflitsEmploi(payload);
       if (res?.hasConflict) {
         setCreneauErreur('Conflit : ' + (res.conflicts || []).join(' · '));
         return;
       }
-      // 2) Créer le créneau
       await createEmploi(payload);
       setAddOuvert(false);
       setCreneauForm({ idClasse: '', idCours: '', jour: 'Lundi', heure: '08:00' });
@@ -671,13 +657,11 @@ export default function SchedulePage() {
     }
   };
 
-  // Detect mobile
   if (typeof window !== 'undefined') {
     const mq = window.matchMedia('(max-width: 768px)');
     if (mq.matches !== isMobile) setIsMobile(mq.matches);
   }
 
-  // Filter options per mode
   const filterOptions = useMemo(() => {
     if (viewMode === 'class') return classes.map(c => ({ value: String(c.idClasse), label: c.libelle }));
     if (viewMode === 'teacher') return enseignants.map(e => ({ value: String(e.idPers), label: `${e.prenom} ${e.nom}` }));
@@ -685,20 +669,37 @@ export default function SchedulePage() {
     return [];
   }, [viewMode, classes, enseignants, salles]);
 
-  // Filtered schedule entries.
-  // ⚠️ Un créneau ne stocke QUE la classe (ni enseignant ni salle) : pour les
-  // vues "enseignant" et "salle", on dérive la classe (enseignant→classe,
-  // salle→classe) puis on filtre les créneaux de cette classe.
   const filteredSlots = useMemo(() => {
-    if (!selectedFilter) return []; // rien tant qu'aucune sélection
+    if (!selectedFilter) return [];
     if (viewMode === 'class') {
       return emploi.filter(s => String(s.idClasse) === selectedFilter);
     }
     if (viewMode === 'teacher') {
-      // La classe d'un enseignant vient du titulariat (idPers -> salle -> classe).
       const t = titulaires.find(tt => String(tt.personne?.idPers) === selectedFilter && Number(tt.actif) === 1);
       const idC = t?.salle?.classe?.idClasse;
-      return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
+      const teacher = enseignants.find(e => String(e.idPers) === selectedFilter);
+      
+      let slots = [];
+      if (idC) {
+        slots = emploi.filter(s => {
+          if (Number(s.idClasse) !== Number(idC)) return false;
+          // Retirer si remplacé sur ce créneau (Rôle A dans le plan)
+          const sw = plan.find(p => p.jour === s.jour && String(p.heure).padStart(5, '0') === String(s.heure).padStart(5, '0') && Number(p.enseignantEnDifficulte?.idEnseignant) === Number(teacher?.idEnseignant));
+          if (sw) return false;
+          return true;
+        });
+      }
+      
+      // Ajouter les créneaux où il intervient comme intérimaire (Rôle B)
+      const interims = plan.filter(p => Number(p.interimaire?.idEnseignant) === Number(teacher?.idEnseignant));
+      for (const p of interims) {
+        const h = String(p.heure).padStart(5, '0');
+        const s = emploi.find(em => em.jour === p.jour && String(em.heure).padStart(5, '0') === h && Number(em.idClasse) === Number(p.classeInterimaire?.idClasse));
+        if (s) {
+          slots.push({ ...s, swapRole: 'B', matiere: p.matiereContrepartie?.libelle, targetClasse: p.classeInterimaire?.libelle });
+        }
+      }
+      return slots;
     }
     if (viewMode === 'room') {
       const salle = salles.find(s => String(s.idSalle) === selectedFilter);
@@ -706,7 +707,7 @@ export default function SchedulePage() {
       return idC ? emploi.filter(s => Number(s.idClasse) === Number(idC)) : [];
     }
     return [];
-  }, [viewMode, selectedFilter, emploi, enseignants, salles, titulaires]);
+  }, [viewMode, selectedFilter, emploi, enseignants, salles, titulaires, plan]);
 
   const aucuneSelection = !selectedFilter;
 
@@ -974,6 +975,14 @@ export default function SchedulePage() {
             </div>
           </>
         )}
+        <ConfirmDeleteModal
+          isOpen={deleteModal.isOpen}
+          title="Confirmation de suppression"
+          message={deleteModal.message}
+          impact={deleteModal.impact}
+          onClose={() => setDeleteModal({ isOpen: false, item: null, impact: [], message: "" })}
+          onConfirm={executeDelete}
+        />
       </div>
 
       {/* ── Modal : ajouter un créneau ── */}

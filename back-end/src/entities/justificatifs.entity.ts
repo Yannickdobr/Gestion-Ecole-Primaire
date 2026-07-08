@@ -8,6 +8,9 @@ import {
  */
 @Entity('justificatifs')
 export class Justificatifs {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   ID: number;
 

@@ -11,6 +11,7 @@ import {
   getSpecialites,
 } from "@/lib/api";
 import { BookOpen, Plus, Trash2, Edit, Search, X } from "lucide-react";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 const thStyle = { padding: "16px 24px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
 const tdStyle = { padding: "16px 24px", fontSize: 14, color: "var(--text-dark)", borderBottom: "1px solid var(--surface-border)" };
@@ -25,6 +26,7 @@ export default function BibliothequePage() {
   const [specialites, setSpecialites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, impact: [], message: "" });
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState(null);
 
@@ -121,14 +123,18 @@ export default function BibliothequePage() {
     }
   };
 
-  const supprimer = async (idLivre) => {
-    if (!window.confirm("Voulez-vous vraiment supprimer ce livre ?")) return;
-    setBusyId(idLivre);
+  const supprimer = async (livre, force = false) => {
+    setBusyId(livre.idLivre);
     try {
-      await deleteLivre(idLivre);
+      await deleteLivre(livre.idLivre, force);
+      if (deleteModal.isOpen) setDeleteModal({ isOpen: false, item: null, impact: [], message: "" });
       await charger();
     } catch (e) {
-      alert(e.message || "Échec de la suppression.");
+      if (e.requireConfirmation) {
+        setDeleteModal({ isOpen: true, item: livre, impact: e.impact, message: e.message });
+      } else {
+        alert(e.message || "Échec de la suppression.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -143,6 +149,15 @@ export default function BibliothequePage() {
         title="Bibliothèque"
         subtitle="Gérez l'inventaire des livres de l'établissement."
         icon={<BookOpen size={28} color="var(--orange)" />}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, item: null, impact: [], message: "" })}
+        onConfirm={() => supprimer(deleteModal.item, deleteModal.impact && deleteModal.impact.length > 0)}
       />
 
       <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
@@ -207,7 +222,7 @@ export default function BibliothequePage() {
                           Modifier
                         </button>
                         <button
-                          onClick={() => supprimer(livre.idLivre)}
+                          onClick={() => setDeleteModal({ isOpen: true, item: livre, impact: [], message: "Voulez-vous vraiment supprimer ce livre ?" })}
                           disabled={busyId === livre.idLivre}
                           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                         >

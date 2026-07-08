@@ -52,7 +52,9 @@ import {
   
       // ── Recherche dans Admin ──────────────────────────────────────────
       const admin = await this.adminRepository.findOne({
-        where: { username, actif: 1 },
+        where: { username, actif: 1,
+            isDelete: 0
+        },
       });
   
       if (admin) {
@@ -92,7 +94,9 @@ import {
   
       // ── Recherche dans Personne ───────────────────────────────────────
       const personne = await this.personneRepository.findOne({
-        where: { username },
+        where: { username,
+            isDelete: 0
+        },
       });
   
       if (!personne) {
@@ -160,8 +164,12 @@ import {
       };
       if (!username) return generique;
 
-      const admin = await this.adminRepository.findOne({ where: { username } });
-      const personne = admin ? null : await this.personneRepository.findOne({ where: { username } });
+      const admin = await this.adminRepository.findOne({ where: { username,
+          isDelete: 0
+    } });
+      const personne = admin ? null : await this.personneRepository.findOne({ where: { username,
+          isDelete: 0
+    } });
       if (!admin && !personne) return generique;
 
       const nouveau = genererMotDePasse();
@@ -203,7 +211,9 @@ import {
      */
     async createFirstAdmin(nom: string, username: string, password: string) {
       // Vérifier si l'utilisateur existe déjà avec ce username
-      const exists = await this.adminRepository.findOne({ where: { username } });
+      const exists = await this.adminRepository.findOne({ where: { username,
+          isDelete: 0
+    } });
       if (exists) {
         return { message: 'Admin déjà existant' };
       }
@@ -231,14 +241,18 @@ import {
       dto: ChangePasswordDto,
     ) {
       if (user.role === 'admin') {
-        const admin = await this.adminRepository.findOne({ where: { ID: user.id } });
+        const admin = await this.adminRepository.findOne({ where: { ID: user.id,
+            isDelete: 0
+        } });
         if (!admin) throw new NotFoundException('Compte introuvable');
         const ok = await bcrypt.compare(dto.ancienMotDePasse, admin.password);
         if (!ok) throw new UnauthorizedException('Ancien mot de passe incorrect');
         admin.password = await bcrypt.hash(dto.nouveauMotDePasse, 10);
         await this.adminRepository.save(admin);
       } else {
-        const personne = await this.personneRepository.findOne({ where: { idPers: user.id } });
+        const personne = await this.personneRepository.findOne({ where: { idPers: user.id,
+            isDelete: 0
+        } });
         if (!personne) throw new NotFoundException('Compte introuvable');
         const ok = await bcrypt.compare(dto.ancienMotDePasse, personne.password);
         if (!ok) throw new UnauthorizedException('Ancien mot de passe incorrect');
@@ -254,7 +268,9 @@ import {
      * uniquement les admins de LEUR type.
      */
     async listAdmins(user: { role: string; typeRole: number }) {
-      const tous = await this.adminRepository.find({ order: { ID: 'ASC' } });
+      const tous = await this.adminRepository.find({
+          where: { isDelete: 0 },
+        order: { ID: 'ASC' } });
       if (user?.role !== 'admin') return [];
       if ([0, 2].includes(Number(user.typeRole))) return tous;
       return tous.filter((a) => Number(a.typeAdmin) === Number(user.typeRole));
@@ -271,14 +287,17 @@ import {
       if (Number(targetId) === Number(user.id)) {
         throw new ForbiddenException('Vous ne pouvez pas supprimer votre propre compte.');
       }
-      const admin = await this.adminRepository.findOne({ where: { ID: targetId } });
+      const admin = await this.adminRepository.findOne({ where: { ID: targetId,
+          isDelete: 0
+    } });
       if (!admin) throw new NotFoundException('Administrateur introuvable');
       // Le compte Root (typeAdmin 0) est protégé : personne ne peut le supprimer.
       if (Number(admin.typeAdmin) === 0) {
         throw new ForbiddenException('Le compte Root est protégé et ne peut pas être supprimé.');
       }
       try {
-        await this.adminRepository.remove(admin);
+        admin.isDelete = 1;
+        await this.adminRepository.save(admin);
       } catch {
         throw new ConflictException("Suppression impossible : cet administrateur est lié à des données.");
       }
@@ -303,7 +322,9 @@ import {
         throw new ForbiddenException("Vous n'êtes pas autorisé à créer ce type de compte.");
       }
 
-      const exists = await this.adminRepository.findOne({ where: { username: dto.username } });
+      const exists = await this.adminRepository.findOne({ where: { username: dto.username,
+          isDelete: 0
+    } });
       if (exists) throw new ConflictException(`L'identifiant "${dto.username}" est déjà utilisé`);
 
       const motDePasseClair = genererMotDePasse();

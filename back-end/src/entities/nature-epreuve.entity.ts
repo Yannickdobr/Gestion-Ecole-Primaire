@@ -12,6 +12,9 @@ import { Epreuve } from './epreuve.entity';
  */
 @Entity('natureepreuve')
 export class NatureEpreuve {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idNature: number;
 

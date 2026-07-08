@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, UseGuards, HttpCode, HttpStatus, Request,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, ParseIntPipe, UseGuards, HttpCode, HttpStatus, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaiementsService } from './paiements.service';
@@ -47,7 +47,7 @@ export class PaiementsController {
   @Delete('modes/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un mode de paiement' })
-  removeMode(@Param('id', ParseIntPipe) id: number) { return this.paiementsService.removeMode(id); }
+  removeMode(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.paiementsService.removeMode(id, force === 'true'); }
 
   // ── Scolarités ────────────────────────────────────────────────────────
   @Get('scolarites')
@@ -75,7 +75,7 @@ export class PaiementsController {
   @Delete('scolarites/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une scolarité' })
-  removeScolarite(@Param('id', ParseIntPipe) id: number) { return this.paiementsService.removeScolarite(id); }
+  removeScolarite(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.paiementsService.removeScolarite(id, force === 'true'); }
 
   // ── Tranches ──────────────────────────────────────────────────────────
   @Post('tranches')
@@ -99,7 +99,7 @@ export class PaiementsController {
   @Delete('tranches/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une tranche' })
-  removeTranche(@Param('id', ParseIntPipe) id: number) { return this.paiementsService.removeTranche(id); }
+  removeTranche(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.paiementsService.removeTranche(id, force === 'true'); }
 
   // ── Paiements ─────────────────────────────────────────────────────────
   @Post()
@@ -137,7 +137,7 @@ export class PaiementsController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un paiement' })
-  removePaiement(@Param('id', ParseIntPipe) id: number) { return this.paiementsService.removePaiement(id); }
+  removePaiement(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.paiementsService.removePaiement(id, force === 'true'); }
 
   // ── Arriérés ──────────────────────────────────────────────────────────
   @Get('arrieres/:matricule/annee/:idAca')

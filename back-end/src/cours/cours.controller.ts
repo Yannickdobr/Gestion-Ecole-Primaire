@@ -34,9 +34,6 @@ export class CoursController {
   @ApiQuery({ name: 'q', required: true })
   searchCours(@Query('q') query: string) { return this.coursService.searchCours(query ?? ''); }
 
-  @Get('par-classe/:idClasse')
-  @ApiOperation({ summary: 'Cours actifs d\'une classe' })
-  findCoursByClasse(@Param('idClasse', ParseIntPipe) idClasse: number) { return this.coursService.findCoursByClasse(idClasse); }
 
   // NB : les routes :id sont déclarées plus bas, APRÈS les routes statiques
   // (disciplines, specialites, livres) — sinon /cours/livres serait capturé
@@ -66,7 +63,7 @@ export class CoursController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une discipline' })
-  removeDiscipline(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeDiscipline(id); }
+  removeDiscipline(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.coursService.removeDiscipline(id, force === 'true'); }
 
   // ── Spécialités ────────────────────────────────────────────────────────
   @Get('specialites')
@@ -92,7 +89,7 @@ export class CoursController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une spécialité' })
-  removeSpecialite(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeSpecialite(id); }
+  removeSpecialite(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.coursService.removeSpecialite(id, force === 'true'); }
 
   // ── Livres ─────────────────────────────────────────────────────────────
   // La bibliothèque est gérée par la direction ET le personnel « Autres ».
@@ -128,7 +125,7 @@ export class CoursController {
   @Roles(...DIRECTION, Role.AUTRES)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un livre' })
-  removeLivre(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeLivre(id); }
+  removeLivre(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.coursService.removeLivre(id, force === 'true'); }
 
   // ── Cours par id (déclaré APRÈS les routes statiques pour éviter la collision) ──
   @Get(':id')
@@ -149,5 +146,5 @@ export class CoursController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un cours' })
-  removeCours(@Param('id', ParseIntPipe) id: number) { return this.coursService.removeCours(id); }
+  removeCours(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.coursService.removeCours(id, force === 'true'); }
 }

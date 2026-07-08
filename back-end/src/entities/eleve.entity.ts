@@ -21,6 +21,9 @@ import { Frequente } from './frequente.entity';
  */
 @Entity('eleve')
 export class Eleve {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   matricule: number;
 

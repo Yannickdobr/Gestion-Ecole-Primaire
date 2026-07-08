@@ -32,10 +32,6 @@ export class CreateCoursDto {
   @IsString()
   description?: string;
 
-  @IsInt()
-  @IsNotEmpty({ message: "L'identifiant de la classe est obligatoire" })
-  idClasse: number;
-
   @IsOptional()
   @IsInt()
   idLivre?: number;
@@ -64,10 +60,6 @@ export class UpdateCoursDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @IsOptional()
-  @IsInt()
-  idClasse?: number;
 
   @IsOptional()
   @IsInt()

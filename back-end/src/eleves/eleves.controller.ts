@@ -86,7 +86,7 @@ export class ElevesController {
   @Roles(...DIRECTION, Role.SCOLARITE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer définitivement un élève' })
-  remove(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.remove(matricule); }
+  remove(@Param('matricule', ParseIntPipe) matricule: number, @Query('force') force?: string) { return this.elevesService.remove(matricule, force === 'true'); }
 
   @Get(':matricule/parents')
   @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)

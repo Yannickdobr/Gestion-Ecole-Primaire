@@ -16,6 +16,9 @@ import { Session } from './session.entity';
  */
 @Entity('trimestre')
 export class Trimestre {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idTrimes: number;
 

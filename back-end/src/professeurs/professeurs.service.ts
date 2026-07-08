@@ -14,6 +14,9 @@ import { Cours } from '../entities/cours.entity';
 import { Salle } from '../entities/salle.entity';
 import { Classe } from '../entities/classe.entity';
 import { MailService } from '../mail/mail.service';
+import { verifierAvantSuppression } from '../common/referential-integrity';
+import { Parents } from '../entities/parents.entity';
+import { Residents } from '../entities/residents.entity';
 
 // Génère un mot de passe provisoire lisible (sans caractères ambigus)
 function genererMotDePasse(longueur = 10): string {
@@ -81,18 +84,26 @@ export class ProfesseursService {
     user?: { id: number; role: string },
   ): Promise<Admin | null> {
     if (dtoIdAdmin) {
-      const a = await this.adminRepository.findOne({ where: { ID: dtoIdAdmin } });
+      const a = await this.adminRepository.findOne({ where: { ID: dtoIdAdmin,
+          isDelete: 0
+    } });
       if (a) return a;
     }
     if (user?.role === 'admin' && user.id) {
-      const a = await this.adminRepository.findOne({ where: { ID: user.id } });
+      const a = await this.adminRepository.findOne({ where: { ID: user.id,
+          isDelete: 0
+    } });
       if (a) return a;
     }
     if (user?.role === 'personne' && user.id) {
-      const p = await this.personneRepository.findOne({ where: { idPers: user.id }, relations: ['admin'] });
+      const p = await this.personneRepository.findOne({ where: { idPers: user.id,
+          isDelete: 0
+    }, relations: ['admin'] });
       if (p?.admin) return p.admin;
     }
-    const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+    const premier = await this.adminRepository.find({
+        where: { isDelete: 0 },
+        order: { ID: 'ASC' }, take: 1 });
     return premier[0] ?? null;
   }
 
@@ -102,7 +113,9 @@ export class ProfesseursService {
   ): Promise<Personne> {
     // Vérifier que le username n'existe pas déjà
     const exists = await this.personneRepository.findOne({
-      where: { username: dto.username },
+      where: { username: dto.username,
+          isDelete: 0
+    },
     });
     if (exists) {
       throw new ConflictException(
@@ -156,40 +169,50 @@ export class ProfesseursService {
    */
   async findAllPersonnes(): Promise<Personne[]> {
     return this.personneRepository.find({
-      where: { typePersonne: 2 },
+      where: { typePersonne: 2,
+          isDelete: 0
+    },
       order: { nom: 'ASC' },
     });
   }
 
   /** Lister toutes les personnes, tous types confondus (pour choisir un expéditeur de message) */
   async findAllPersonnesTous(): Promise<Personne[]> {
-    return this.personneRepository.find({ order: { nom: 'ASC' } });
+    return this.personneRepository.find({
+        where: { isDelete: 0 },
+        order: { nom: 'ASC' } });
   }
 
   /**
    * Supprimer un compte Personne (membre du personnel ou parent).
    * On retire d'abord ses liens directs (enseignant, titulaire).
    */
-  async removePersonne(idPers: number): Promise<{ message: string }> {
-    const personne = await this.personneRepository.findOne({ where: { idPers } });
+  async removePersonne(idPers: number, force: boolean = false): Promise<{ message: string }> {
+    const personne = await this.personneRepository.findOne({ where: { idPers, isDelete: 0 } });
     if (!personne) throw new NotFoundException('Personne introuvable');
 
-    // Transaction : on retire les rôles (enseignant/titulaire) puis le compte.
-    // Si le compte est encore référencé ailleurs (parent, messages, notes…), tout
-    // est annulé (rollback) — pas de suppression partielle — et on renvoie un 409.
-    try {
-      await this.personneRepository.manager.transaction(async (m) => {
-        const ens = await m.find(Enseignant, { where: { personne: { idPers } } });
-        if (ens.length) await m.remove(ens);
-        const tits = await m.find(Titulaire, { where: { personne: { idPers } } });
-        if (tits.length) await m.remove(tits);
-        await m.remove(personne);
-      });
-    } catch {
-      throw new ConflictException(
-        "Suppression impossible : ce compte est encore lié à d'autres données (parent d'élève, messages, notes, paiements…). Désactivez-le plutôt.",
-      );
-    }
+    await verifierAvantSuppression(
+      this.personneRepository.manager,
+      `le compte "${personne.nom} ${personne.prenom}"`,
+      [
+        { entity: Enseignant, where: { personne: { idPers } }, label: (n) => `${n} rôle(s) enseignant` },
+        { entity: Titulaire, where: { personne: { idPers } }, label: (n) => `${n} rôle(s) titulaire` },
+        { entity: Parents, where: { personne: { idPers } }, label: (n) => `${n} liaison(s) parent` },
+        { entity: Residents, where: { personne: { idPers } }, label: (n) => `${n} adresse(s) résidente` },
+      ],
+      force,
+      "Désactivez-le plutôt si vous souhaitez conserver l'historique (notes, messages, paiements, etc)."
+    );
+
+    await this.personneRepository.manager.transaction(async (m) => {
+      // Si force = true ou s'il n'y a pas de dépendances bloquantes, 
+      // verifierAvantSuppression se charge de mettre à jour `isDelete = 1` 
+      // pour les entités dépendantes listées. 
+      // Il ne reste qu'à supprimer la personne elle-même.
+      personne.isDelete = 1;
+      await m.save(personne);
+    });
+
     return { message: 'Compte supprimé' };
   }
 
@@ -198,7 +221,9 @@ export class ProfesseursService {
    */
   async findPersonneById(idPers: number): Promise<Personne> {
     const personne = await this.personneRepository.findOne({
-      where: { idPers },
+      where: { idPers,
+          isDelete: 0
+    },
     });
     if (!personne) {
       throw new NotFoundException(`Personne introuvable (id: ${idPers})`);
@@ -226,7 +251,9 @@ export class ProfesseursService {
     // Vérifier unicité du username si modifié
     if (dto.username !== undefined && dto.username !== personne.username) {
       const exists = await this.personneRepository.findOne({
-        where: { username: dto.username },
+        where: { username: dto.username,
+            isDelete: 0
+        },
       });
       if (exists) {
         throw new ConflictException(
@@ -251,7 +278,9 @@ export class ProfesseursService {
 
     // Vérifier qu'il n'est pas déjà enregistré comme enseignant
     const exists = await this.enseignantRepository.findOne({
-      where: { personne: { idPers: dto.idPers } },
+      where: { personne: { idPers: dto.idPers },
+          isDelete: 0
+    },
     });
     if (exists) {
       throw new ConflictException('Cette personne est déjà enregistrée comme enseignant');
@@ -262,7 +291,9 @@ export class ProfesseursService {
     // Matière de difficulté (cours qu'il ne donne pas) — optionnelle
     let cours: Cours | undefined = undefined;
     if (dto.idCours) {
-      const c = await this.coursRepository.findOne({ where: { idCours: dto.idCours } });
+      const c = await this.coursRepository.findOne({ where: { idCours: dto.idCours,
+          isDelete: 0
+    } });
       if (!c) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
       cours = c;
     }
@@ -275,10 +306,14 @@ export class ProfesseursService {
 
     // Admin : fourni, sinon l'admin racine par défaut (idAdmin NOT NULL en BD)
     let admin = dto.idAdmin
-      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin,
+          isDelete: 0
+    } })
       : null;
     if (!admin) {
-      const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+      const premier = await this.adminRepository.find({
+          where: { isDelete: 0 },
+        order: { ID: 'ASC' }, take: 1 });
       admin = premier[0] ?? null;
     }
     if (admin) enseignant.admin = admin;
@@ -292,13 +327,17 @@ export class ProfesseursService {
    * La matière doit appartenir à la classe de l'enseignant.
    */
   async setMatiereDifficulte(idEnseignant: number, idCours: number | null): Promise<Enseignant> {
-    const ens = await this.enseignantRepository.findOne({ where: { idEnseignant } });
+    const ens = await this.enseignantRepository.findOne({ where: { idEnseignant,
+        isDelete: 0
+    } });
     if (!ens) throw new NotFoundException(`Enseignant introuvable (id: ${idEnseignant})`);
 
     if (idCours == null) {
       ens.cours = null as any; // efface la matière de difficulté
     } else {
-      const cours = await this.coursRepository.findOne({ where: { idCours } });
+      const cours = await this.coursRepository.findOne({ where: { idCours,
+          isDelete: 0
+    } });
       if (!cours) throw new NotFoundException(`Cours introuvable (id: ${idCours})`);
       // L'enseignant n'a plus de classe propre (elle vient du titulariat) :
       // on accepte n'importe quel cours valide comme matière de difficulté.
@@ -312,7 +351,8 @@ export class ProfesseursService {
    */
   async findAllEnseignants(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
-      relations: ['personne'], // classe.salles → affichage « Classe X · Salle Y »
+        where: { isDelete: 0 },
+        relations: ['personne'], // classe.salles → affichage « Classe X · Salle Y »
       order: { created_at: 'DESC' },
     });
   }
@@ -322,7 +362,9 @@ export class ProfesseursService {
    */
   async findEnseignantsActifs(): Promise<Enseignant[]> {
     return this.enseignantRepository.find({
-      where: { actif: 1 }, // ✅ minuscule corrigé
+      where: { actif: 1,
+          isDelete: 0
+    }, // ✅ minuscule corrigé
       relations: ['personne'],
       order: { created_at: 'DESC' },
     });
@@ -333,7 +375,9 @@ export class ProfesseursService {
    */
   async findEnseignantById(idEnseignant: number): Promise<Enseignant> {
     const enseignant = await this.enseignantRepository.findOne({
-      where: { idEnseignant },
+      where: { idEnseignant,
+          isDelete: 0
+    },
       relations: ['personne'],
     });
     if (!enseignant) {
@@ -369,9 +413,10 @@ export class ProfesseursService {
   /**
    * Supprimer un enseignant
    */
-  async removeEnseignant(idEnseignant: number): Promise<{ message: string }> {
+  async removeEnseignant(idEnseignant: number, force: boolean = false): Promise<{ message: string }> {
     const enseignant = await this.findEnseignantById(idEnseignant);
-    await this.enseignantRepository.remove(enseignant);
+    enseignant.isDelete = 1;
+    await this.enseignantRepository.save(enseignant);
     return { message: `Enseignant id ${idEnseignant} supprimé` };
   }
 
@@ -386,19 +431,25 @@ export class ProfesseursService {
     const personne = await this.findPersonneById(dto.idPers);
 
     const exists = await this.titulaireRepository.findOne({
-      where: { personne: { idPers: dto.idPers } },
+      where: { personne: { idPers: dto.idPers },
+          isDelete: 0
+    },
     });
     if (exists) {
       throw new ConflictException('Cette personne est déjà enregistrée comme titulaire');
     }
 
     // idSalle est NOT NULL en BD
-    const salle = await this.salleRepository.findOne({ where: { idSalle: dto.idSalle } });
+    const salle = await this.salleRepository.findOne({ where: { idSalle: dto.idSalle,
+        isDelete: 0
+    } });
     if (!salle) throw new NotFoundException(`Salle introuvable (id: ${dto.idSalle})`);
 
     // Une salle ne peut avoir qu'UN SEUL titulaire actif
     const dejaTitulaire = await this.titulaireRepository.findOne({
-      where: { salle: { idSalle: dto.idSalle }, actif: 1 },
+      where: { salle: { idSalle: dto.idSalle }, actif: 1,
+          isDelete: 0
+    },
     });
     if (dejaTitulaire) {
       throw new ConflictException(
@@ -414,10 +465,14 @@ export class ProfesseursService {
 
     // Admin : celui fourni, sinon l'admin racine par défaut
     let admin = dto.idAdmin
-      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin } })
+      ? await this.adminRepository.findOne({ where: { ID: dto.idAdmin,
+          isDelete: 0
+    } })
       : null;
     if (!admin) {
-      const premier = await this.adminRepository.find({ order: { ID: 'ASC' }, take: 1 });
+      const premier = await this.adminRepository.find({
+          where: { isDelete: 0 },
+        order: { ID: 'ASC' }, take: 1 });
       admin = premier[0] ?? null;
     }
     if (admin) titulaire.admin = admin;
@@ -430,17 +485,23 @@ export class ProfesseursService {
    */
   async updateTitulaire(idTitulaire: number, idSalle: number): Promise<Titulaire> {
     const titulaire = await this.titulaireRepository.findOne({
-      where: { idTitulaire },
+      where: { idTitulaire,
+          isDelete: 0
+    },
       relations: ['personne', 'salle'],
     });
     if (!titulaire) throw new NotFoundException(`Titulaire introuvable (id: ${idTitulaire})`);
-    const salle = await this.salleRepository.findOne({ where: { idSalle } });
+    const salle = await this.salleRepository.findOne({ where: { idSalle,
+        isDelete: 0
+    } });
     if (!salle) throw new NotFoundException(`Salle introuvable (id: ${idSalle})`);
 
     // La nouvelle salle ne doit pas déjà avoir un autre titulaire actif
     if (Number(titulaire.salle?.idSalle) !== Number(idSalle)) {
       const deja = await this.titulaireRepository.findOne({
-        where: { salle: { idSalle }, actif: 1 },
+        where: { salle: { idSalle }, actif: 1,
+            isDelete: 0
+        },
       });
       if (deja && Number(deja.idTitulaire) !== Number(idTitulaire)) {
         throw new ConflictException("Cette salle a déjà un titulaire actif.");
@@ -455,7 +516,8 @@ export class ProfesseursService {
    */
   async findAllTitulaires(): Promise<Titulaire[]> {
     return this.titulaireRepository.find({
-      relations: ['personne'],
+        where: { isDelete: 0 },
+        relations: ['personne'],
       order: { created_at: 'DESC' },
     });
   }
@@ -465,7 +527,9 @@ export class ProfesseursService {
    */
   async findTitulaireById(idTitulaire: number): Promise<Titulaire> {
     const titulaire = await this.titulaireRepository.findOne({
-      where: { idTitulaire },
+      where: { idTitulaire,
+          isDelete: 0
+    },
       relations: ['personne'],
     });
     if (!titulaire) {
@@ -489,9 +553,10 @@ export class ProfesseursService {
   /**
    * Supprimer un titulaire
    */
-  async removeTitulaire(idTitulaire: number): Promise<{ message: string }> {
+  async removeTitulaire(idTitulaire: number, force: boolean = false): Promise<{ message: string }> {
     const titulaire = await this.findTitulaireById(idTitulaire);
-    await this.titulaireRepository.remove(titulaire);
+    titulaire.isDelete = 1;
+    await this.titulaireRepository.save(titulaire);
     return { message: `Titulaire id ${idTitulaire} supprimé` };
   }
 

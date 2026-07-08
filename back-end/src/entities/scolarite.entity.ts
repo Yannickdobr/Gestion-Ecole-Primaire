@@ -17,6 +17,9 @@ import { Tranches } from './tranches.entity';
  */
 @Entity('scolarite')
 export class Scolarite {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idScolarite: number;
 

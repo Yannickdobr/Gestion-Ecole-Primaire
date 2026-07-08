@@ -5,6 +5,9 @@ import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
  */
 @Entity('quartier')
 export class Quartier {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idQuartier: number;
 

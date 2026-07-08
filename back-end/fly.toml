@@ -1,24 +1,28 @@
-# Configuration Fly.io — backend NestJS (BrightSchool)
-# ⚠️ "app" doit être unique sur tout Fly.io : change-le si le nom est déjà pris.
-app = "gestion-ecole-primaire"
-primary_region = "cdg"   # Paris. Autres : "ams" (Amsterdam), "jnb" (Johannesburg)
+# fly.toml app configuration file generated for gestion-ecole-primaire on 2026-07-05T09:17:23+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'gestion-ecole-primaire'
+primary_region = 'cdg'
 
 [build]
 
-# Variables NON sensibles (les secrets — mots de passe, JWT_SECRET — via `fly secrets set`)
 [env]
-  NODE_ENV = "production"
-  PORT = "8080"
-  JWT_EXPIRES_IN = "30m"
-  DB_SSL = "true"
+  DB_SSL = 'true'
+  JWT_EXPIRES_IN = '30m'
+  NODE_ENV = 'production'
+  PORT = '8080'
 
 [http_service]
   internal_port = 8080
   force_https = true
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  auto_stop_machines = false   # ne pas éteindre
-  min_machines_running = 1     # reste allumé -> pas de cold-start
+  min_machines_running = 1
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512

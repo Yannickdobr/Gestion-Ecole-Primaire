@@ -24,6 +24,7 @@ import {
   deleteAdmin,
 } from "@/lib/api";
 import { Users, GraduationCap, UserCheck, Power, PowerOff, UserPlus, X, MapPin, Shield, Trash2 } from "lucide-react";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 // Libellés de rôle (Personne.typePersonne et Admin.typeAdmin)
 const TYPE_PERSONNE = { 1: "Enseignant", 2: "Administratif (secrétariat)", 3: "Scolarité (inscriptions)", 4: "Parent", 5: "Autres" };
@@ -31,7 +32,7 @@ const TYPE_ADMIN = { 0: "Root", 1: "Admin standard (déprécié)", 2: "Fondateur
 
 const inputStyle = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 6 };
-const STAFF_VIDE = { nom: "", prenom: "", username: "", mobile: "", typePersonne: "1", idClasse: "", idSalle: "", idCours: "" };
+const STAFF_VIDE = { nom: "", prenom: "", username: "", mobile: "", typePersonne: "1", idCours: "" };
 
 // Avatar à initiales
 function Avatar({ prenom = "", nom = "" }) {
@@ -109,6 +110,7 @@ function StaffPage() {
   const [titEditErr, setTitEditErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, type: null, impact: [], message: "" });
   const [busyId, setBusyId] = useState(null); // id en cours d'action
 
   // Modal "Nouveau membre du personnel"
@@ -214,24 +216,33 @@ function StaffPage() {
     }
   };
 
-  const supprimerPersonne = async (p) => {
-    if (typeof window !== "undefined" && !window.confirm(`Supprimer le compte de ${p.prenom} ${p.nom} ?`)) return;
-    setBusyId(`per-${p.idPers}`); setError("");
-    try {
-      await deletePersonne(p.idPers);
-      setPersonnes(await getPersonnesTous());
-    } catch (e) { setError(e.message || "Suppression impossible."); }
-    finally { setBusyId(null); }
-  };
-
-  const supprimerAdmin = async (a) => {
-    if (typeof window !== "undefined" && !window.confirm(`Supprimer l'administrateur ${a.nom} ?`)) return;
-    setBusyId(`adm-${a.ID}`); setError("");
-    try {
-      await deleteAdmin(a.ID);
-      setAdmins(await getAdmins());
-    } catch (e) { setError(e.message || "Suppression impossible."); }
-    finally { setBusyId(null); }
+  const executeDelete = async () => {
+    const { item, type, impact } = deleteModal;
+    const force = impact && impact.length > 0;
+    
+    if (type === 'admin') {
+      setBusyId(`adm-${item.ID}`); setError("");
+      try {
+        await deleteAdmin(item.ID);
+        setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" });
+        setAdmins(await getAdmins());
+      } catch (e) { setError(e.message || "Suppression impossible."); }
+      finally { setBusyId(null); }
+    } else {
+      setBusyId(`per-${item.idPers}`); setError("");
+      try {
+        await deletePersonne(item.idPers, force);
+        setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" });
+        setPersonnes(await getPersonnesTous());
+      } catch (e) {
+        if (e.requireConfirmation) {
+           setDeleteModal({ ...deleteModal, impact: e.impact, message: e.message });
+        } else {
+           setError(e.message || "Suppression impossible.");
+        }
+      }
+      finally { setBusyId(null); }
+    }
   };
 
   const majForm = (champ, val) => setForm((f) => ({ ...f, [champ]: val }));
@@ -261,11 +272,6 @@ function StaffPage() {
           idCours: idCours ? Number(idCours) : undefined,
           idAdmin,
         });
-        // 3) La classe se donne via le titulariat : si une salle est choisie,
-        //    on affecte tout de suite l'enseignant comme titulaire de cette salle.
-        if (form.idSalle) {
-          await createTitulaire({ idPers: personne.idPers, idSalle: Number(form.idSalle), idAdmin });
-        }
       }
       setModalOuvert(false);
       setForm(STAFF_VIDE);
@@ -436,7 +442,7 @@ function StaffPage() {
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.username}</td>
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.mobile && p.mobile !== "000" ? p.mobile : "—"}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
-                      <button onClick={() => supprimerPersonne(p)} disabled={busyId === `per-${p.idPers}`} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      <button onClick={() => setDeleteModal({ isOpen: true, item: p, type: 'personne', impact: [], message: `Voulez-vous vraiment supprimer le compte de ${p.prenom} ${p.nom} ?` })} disabled={busyId === `per-${p.idPers}`} title="Supprimer le membre" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                         <Trash2 size={14} /> {busyId === `per-${p.idPers}` ? "…" : "Supprimer"}
                       </button>
                     </td>
@@ -459,7 +465,7 @@ function StaffPage() {
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{a.username}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
                       {estRootOuFondateur && Number(a.ID) !== Number(user?.id) && !(Number(user?.typeRole) === 2 && Number(a.typeAdmin) === 0) ? (
-                        <button onClick={() => supprimerAdmin(a)} disabled={busyId === `adm-${a.ID}`} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        <button onClick={() => setDeleteModal({ isOpen: true, item: a, type: 'admin', impact: [], message: `Voulez-vous vraiment supprimer l'administrateur ${a.nom} ?` })} disabled={busyId === `adm-${a.ID}`} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                           <Trash2 size={14} /> {busyId === `adm-${a.ID}` ? "…" : "Supprimer"}
                         </button>
                       ) : (
@@ -633,44 +639,18 @@ function StaffPage() {
                   <p style={{ fontSize: 11, color: "#8a7060", marginTop: 5 }}>Scolarité et Administratif partagent l'espace « Scolarité » (élèves, paiements, messagerie).</p>
                 </div>
                 {Number(form.typePersonne) === 1 && (
-                  <>
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <label style={labelStyle}>Classe gérée *</label>
-                      <select style={inputStyle} value={form.idClasse} onChange={(e) => setForm((f) => ({ ...f, idClasse: e.target.value, idSalle: "" }))}>
-                        <option value="">— Choisir une classe —</option>
-                        {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
-                      </select>
-                      {classes.length === 0 && <p style={{ fontSize: 12, color: "#8a7060", marginTop: 6 }}>Aucune classe — créez-en une dans « Cours & Classes ».</p>}
-                    </div>
-                    {form.idClasse && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Salle de la classe <span style={{ fontWeight: 400, color: "var(--muted)" }}>(indicatif — l'affectation se fait à la classe)</span></label>
-                        <select style={inputStyle} value={form.idSalle} onChange={(e) => majForm("idSalle", e.target.value)}>
-                          <option value="">— Choisir une salle —</option>
-                          {salles.filter((s) => String(s.classe?.idClasse) === String(form.idClasse)).map((s) => (
-                            <option key={s.idSalle} value={s.idSalle}>{s.libelle}</option>
-                          ))}
-                        </select>
-                        {salles.filter((s) => String(s.classe?.idClasse) === String(form.idClasse)).length === 0 && (
-                          <p style={{ fontSize: 12, color: "#8a7060", marginTop: 6 }}>Cette classe n'a pas encore de salle (Cours & Classes → Salles).</p>
-                        )}
-                      </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Matière de difficulté (optionnel — assurée par un intérimaire)</label>
+                    <select style={inputStyle} value={form.idCours} onChange={(e) => majForm("idCours", e.target.value)}>
+                      <option value="">— Aucune (il donne toutes les matières) —</option>
+                      {cours.map((c) => (
+                        <option key={c.idCours} value={c.idCours}>{c.libelle}</option>
+                      ))}
+                    </select>
+                    {cours.length === 0 && (
+                      <p style={{ fontSize: 11, color: "#8a7060", marginTop: 5 }}>Aucun cours existant (Académique → Cours). La matière de difficulté pourra être définie plus tard.</p>
                     )}
-                    {form.idClasse && (
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Matière de difficulté (optionnel — assurée par un intérimaire)</label>
-                        <select style={inputStyle} value={form.idCours} onChange={(e) => majForm("idCours", e.target.value)}>
-                          <option value="">— Aucune (il donne toutes les matières) —</option>
-                          {cours.filter((c) => String(c.classe?.idClasse) === String(form.idClasse)).map((c) => (
-                            <option key={c.idCours} value={c.idCours}>{c.libelle}</option>
-                          ))}
-                        </select>
-                        {cours.filter((c) => String(c.classe?.idClasse) === String(form.idClasse)).length === 0 && (
-                          <p style={{ fontSize: 11, color: "#8a7060", marginTop: 5 }}>Aucune matière définie pour cette classe (Académique → Cours). La matière de difficulté pourra être définie plus tard.</p>
-                        )}
-                      </div>
-                    )}
-                  </>
+                  </div>
                 )}
               </div>
 
@@ -704,8 +684,8 @@ function StaffPage() {
                 <label style={labelStyle}>Personne *</label>
                 <select style={inputStyle} value={titForm.idPers} onChange={(e) => setTitForm((s) => ({ ...s, idPers: e.target.value }))}>
                   <option value="">— Choisir une personne —</option>
-                  {/* Un titulaire peut être n'importe quel membre du personnel, sauf un parent (type 4) */}
-                  {personnes.filter((p) => Number(p.typePersonne) !== 4).map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
+                  {/* Seuls les enseignants peuvent être titulaires */}
+                  {enseignants.map((e) => <option key={e.personne?.idPers} value={e.personne?.idPers}>{e.personne?.prenom} {e.personne?.nom}</option>)}
                 </select>
               </div>
               <div>
@@ -757,6 +737,15 @@ function StaffPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" })}
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

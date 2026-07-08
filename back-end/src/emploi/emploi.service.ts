@@ -54,8 +54,12 @@ export class EmploiService {
   // ══════════════════════════════════════════════════════════════════════════
   async planInterim(): Promise<any[]> {
     const [creneaux, enseignants, titulaires] = await Promise.all([
-      this.emploiRepository.find({ relations: ['classe', 'cours'] }),
-      this.enseignantRepository.find({ where: { actif: 1 }, relations: ['personne', 'cours'] }),
+      this.emploiRepository.find({
+          where: { isDelete: 0 },
+        relations: ['classe', 'cours'] }),
+      this.enseignantRepository.find({ where: { actif: 1,
+          isDelete: 0
+    }, relations: ['personne', 'cours'] }),
       // La classe d'un enseignant vient du titulariat : idPers -> salle -> classe
       this.enseignantRepository.manager.find(Titulaire, {
         where: { actif: 1 },
@@ -127,18 +131,24 @@ export class EmploiService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createJour(dto: CreateJourSemaineDto): Promise<JourSemaine> {
-    const exists = await this.jourRepository.findOne({ where: { libelle: dto.libelle } });
+    const exists = await this.jourRepository.findOne({ where: { libelle: dto.libelle,
+        isDelete: 0
+    } });
     if (exists) throw new ConflictException(`Le jour "${dto.libelle}" existe déjà`);
     const jour = this.jourRepository.create({ libelle: dto.libelle });
     return this.jourRepository.save(jour);
   }
 
   async findAllJours(): Promise<JourSemaine[]> {
-    return this.jourRepository.find({ order: { ID: 'ASC' } });
+    return this.jourRepository.find({
+        where: { isDelete: 0 },
+        order: { ID: 'ASC' } });
   }
 
   async findJourById(ID: number): Promise<JourSemaine> {
-    const jour = await this.jourRepository.findOne({ where: { ID } });
+    const jour = await this.jourRepository.findOne({ where: { ID,
+        isDelete: 0
+    } });
     if (!jour) throw new NotFoundException(`Jour introuvable (id: ${ID})`);
     return jour;
   }
@@ -149,7 +159,7 @@ export class EmploiService {
     return this.jourRepository.save(jour);
   }
 
-  async removeJour(ID: number): Promise<{ message: string }> {
+  async removeJour(ID: number, force: boolean = false): Promise<{ message: string }> {
     const jour = await this.findJourById(ID);
     await this.jourRepository.remove(jour);
     return { message: `Jour "${jour.libelle}" supprimé` };
@@ -158,7 +168,9 @@ export class EmploiService {
   async seedJours(): Promise<{ message: string }> {
     const jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     for (const libelle of jours) {
-      const exists = await this.jourRepository.findOne({ where: { libelle } });
+      const exists = await this.jourRepository.findOne({ where: { libelle,
+          isDelete: 0
+    } });
       if (!exists) {
         await this.jourRepository.save(this.jourRepository.create({ libelle }));
       }
@@ -171,11 +183,15 @@ export class EmploiService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createCreneau(dto: CreateEmploiDuTempsDto): Promise<EmploiDuTemps> {
-    const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
+    const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse,
+        isDelete: 0
+    } });
     if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
 
     const cours = await this.coursRepository.findOne({
-      where: { idCours: dto.idCours },
+      where: { idCours: dto.idCours,
+          isDelete: 0
+    },
       relations: ['classe'],
     });
     if (!cours) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
@@ -186,7 +202,8 @@ export class EmploiService {
         classe: { idClasse: dto.idClasse },
         jour: dto.jour,
         heure: dto.heure,
-      },
+          isDelete: 0
+    },
     });
     if (conflitClasse) {
       throw new ConflictException(
@@ -200,7 +217,8 @@ export class EmploiService {
         cours: { idCours: dto.idCours },
         jour: dto.jour,
         heure: dto.heure,
-      },
+          isDelete: 0
+    },
     });
     if (conflitCours) {
       throw new ConflictException(
@@ -218,7 +236,9 @@ export class EmploiService {
     });
 
     if (dto.idAdmin) {
-      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin } });
+      const admin = await this.adminRepository.findOne({ where: { ID: dto.idAdmin,
+          isDelete: 0
+    } });
       if (admin) creneau.admin = admin;
     }
 
@@ -229,8 +249,10 @@ export class EmploiService {
     const ordreJours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
     const creneaux = await this.emploiRepository.find({
-      where: { classe: { idClasse } },
-      relations: ['cours', 'cours.classe', 'classe'],
+      where: { classe: { idClasse },
+          isDelete: 0
+    },
+      relations: ['cours', 'classe'],
       order: { heure: 'ASC' },
     });
 
@@ -250,7 +272,9 @@ export class EmploiService {
     const ordreJours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
     const creneaux = await this.emploiRepository.find({
-      where: { cours: { idCours } },
+      where: { cours: { idCours },
+          isDelete: 0
+    },
       relations: ['classe', 'cours'],
       order: { heure: 'ASC' },
     });
@@ -265,7 +289,9 @@ export class EmploiService {
 
   async findByJour(jour: string): Promise<EmploiDuTemps[]> {
     return this.emploiRepository.find({
-      where: { jour },
+      where: { jour,
+          isDelete: 0
+    },
       relations: ['classe', 'cours'],
       order: { heure: 'ASC' },
     });
@@ -277,7 +303,8 @@ export class EmploiService {
     const ordreJours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
     const creneaux = await this.emploiRepository.find({
-      relations: ['classe', 'cours', 'classe.cycle'],
+        where: { isDelete: 0 },
+        relations: ['classe', 'cours', 'classe.cycle'],
       order: { heure: 'ASC' },
     });
 
@@ -291,7 +318,9 @@ export class EmploiService {
 
   async findCreneauById(idTemps: number): Promise<EmploiDuTemps> {
     const c = await this.emploiRepository.findOne({
-      where: { idTemps },
+      where: { idTemps,
+          isDelete: 0
+    },
       relations: ['classe', 'cours', 'admin'],
     });
     if (!c) throw new NotFoundException(`Créneau introuvable (id: ${idTemps})`);
@@ -326,13 +355,17 @@ export class EmploiService {
     // CORRECTION : heureFin retiré — propriété absente de l'entité EmploiDuTemps
 
     if (dto.idClasse !== undefined) {
-      const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
+      const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse,
+          isDelete: 0
+    } });
       if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
       creneau.classe = classe;
     }
 
     if (dto.idCours !== undefined) {
-      const cours = await this.coursRepository.findOne({ where: { idCours: dto.idCours } });
+      const cours = await this.coursRepository.findOne({ where: { idCours: dto.idCours,
+          isDelete: 0
+    } });
       if (!cours) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
       creneau.cours = cours;
     }
@@ -340,17 +373,21 @@ export class EmploiService {
     return this.emploiRepository.save(creneau);
   }
 
-  async removeCreneau(idTemps: number): Promise<{ message: string }> {
+  async removeCreneau(idTemps: number, force: boolean = false): Promise<{ message: string }> {
     const creneau = await this.findCreneauById(idTemps);
-    await this.emploiRepository.remove(creneau);
+    creneau.isDelete = 1;
+    await this.emploiRepository.save(creneau);
     return { message: `Créneau id ${idTemps} supprimé` };
   }
 
   async removeAllByClasse(idClasse: number): Promise<{ message: string }> {
     const creneaux = await this.emploiRepository.find({
-      where: { classe: { idClasse } },
+      where: { classe: { idClasse },
+          isDelete: 0
+    },
     });
-    await this.emploiRepository.remove(creneaux);
+    creneaux.forEach(c => c.isDelete = 1);
+    await this.emploiRepository.save(creneaux);
     return { message: `${creneaux.length} créneau(x) supprimé(s) pour la classe id ${idClasse}` };
   }
 
@@ -365,7 +402,8 @@ export class EmploiService {
         classe: { idClasse: dto.idClasse },
         jour: dto.jour,
         heure: dto.heure,
-      },
+          isDelete: 0
+    },
       relations: ['cours'],
     });
     if (conflitClasse) {
@@ -379,7 +417,8 @@ export class EmploiService {
         cours: { idCours: dto.idCours },
         jour: dto.jour,
         heure: dto.heure,
-      },
+          isDelete: 0
+    },
       relations: ['classe'],
     });
     if (conflitCours) {

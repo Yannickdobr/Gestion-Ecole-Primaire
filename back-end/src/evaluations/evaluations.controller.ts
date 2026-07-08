@@ -54,7 +54,7 @@ export class EvaluationsController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un trimestre' })
-  removeTrimestre(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeTrimestre(id); }
+  removeTrimestre(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeTrimestre(id, force === 'true'); }
 
   // ── Sessions ──────────────────────────────────────────────────────────
   @Get('sessions')
@@ -84,7 +84,7 @@ export class EvaluationsController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une session' })
-  removeSession(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeSession(id); }
+  removeSession(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeSession(id, force === 'true'); }
 
   // ── Natures d'épreuves ────────────────────────────────────────────────
   @Get('natures')
@@ -110,7 +110,7 @@ export class EvaluationsController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une nature' })
-  removeNature(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeNature(id); }
+  removeNature(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeNature(id, force === 'true'); }
 
   // ── Épreuves ──────────────────────────────────────────────────────────
   @Get('epreuves')
@@ -136,7 +136,7 @@ export class EvaluationsController {
   @Roles(...DIRECTION)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une épreuve' })
-  removeEpreuve(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeEpreuve(id); }
+  removeEpreuve(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeEpreuve(id, force === 'true'); }
 
   // ── Notes ─────────────────────────────────────────────────────────────
   @Post('notes')
@@ -186,7 +186,7 @@ export class EvaluationsController {
   @Roles(...DIRECTION, Role.ENSEIGNANT)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer une note' })
-  removeNote(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeNote(id); }
+  removeNote(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeNote(id, force === 'true'); }
 
   // ── Rapports ──────────────────────────────────────────────────────────
   @Post('rapports')
@@ -224,5 +224,5 @@ export class EvaluationsController {
   @Roles(...DIRECTION, Role.ENSEIGNANT)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un bulletin' })
-  removeRapport(@Param('id', ParseIntPipe) id: number) { return this.evaluationsService.removeRapport(id); }
+  removeRapport(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.evaluationsService.removeRapport(id, force === 'true'); }
 }

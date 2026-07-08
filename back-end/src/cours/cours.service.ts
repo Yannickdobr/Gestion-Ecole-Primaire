@@ -49,15 +49,10 @@ export class CoursService {
   // ══════════════════════════════════════════════════════════════════════════
 
   async createCours(dto: CreateCoursDto): Promise<Cours> {
-    const classe = await this.classeRepository.findOne({
-      where: { idClasse: dto.idClasse },
-    });
-    if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
-
     const exists = await this.coursRepository.findOne({
-      where: { libelle: dto.libelle, classe: { idClasse: dto.idClasse } },
+      where: { libelle: dto.libelle, isDelete: 0 },
     });
-    if (exists) throw new ConflictException(`Le cours "${dto.libelle}" existe déjà dans cette classe`);
+    if (exists) throw new ConflictException(`Le cours "${dto.libelle}" existe déjà`);
 
     const cours = this.coursRepository.create({
       libelle: dto.libelle,
@@ -65,7 +60,6 @@ export class CoursService {
       coefficient: dto.coefficient ?? 1.0,
       description: dto.description,
       actif: 1,
-      classe,
     });
 
     if (dto.idLivre) {
@@ -84,23 +78,22 @@ export class CoursService {
 
   async findAllCours(): Promise<Cours[]> {
     return this.coursRepository.find({
-      relations: ['classe', 'classe.cycle'],
+      where: { isDelete: 0 },
       order: { libelle: 'ASC' },
     });
   }
 
   async findCoursByClasse(idClasse: number): Promise<Cours[]> {
+    // Dans ce MCD, Cours n'est pas directement lié à Classe.
     return this.coursRepository.find({
-      where: { classe: { idClasse }, actif: 1 },
-      relations: ['classe', 'classe.cycle'],
+      where: { actif: 1, isDelete: 0 },
       order: { libelle: 'ASC' },
     });
   }
 
   async findCoursById(idCours: number): Promise<Cours> {
     const cours = await this.coursRepository.findOne({
-      where: { idCours },
-      relations: ['classe', 'classe.cycle'],
+      where: { idCours, isDelete: 0 },
     });
     if (!cours) throw new NotFoundException(`Cours introuvable (id: ${idCours})`);
     return cours;
@@ -115,11 +108,7 @@ export class CoursService {
     if (dto.description !== undefined) cours.description = dto.description;
     if (dto.actif !== undefined) cours.actif = dto.actif;
 
-    if (dto.idClasse !== undefined) {
-      const classe = await this.classeRepository.findOne({ where: { idClasse: dto.idClasse } });
-      if (!classe) throw new NotFoundException(`Classe introuvable (id: ${dto.idClasse})`);
-      cours.classe = classe;
-    }
+    // no-op for idClasse as it's not in Cours entity
 
     if (dto.idLivre !== undefined) {
       if (dto.idLivre === null) {
@@ -141,7 +130,7 @@ export class CoursService {
     return { message: `Cours "${cours.libelle}" désactivé` };
   }
 
-  async removeCours(idCours: number): Promise<{ message: string }> {
+  async removeCours(idCours: number, force: boolean = false): Promise<{ message: string }> {
     const cours = await this.findCoursById(idCours);
     await verifierAvantSuppression(
       this.coursRepository.manager,
@@ -151,9 +140,11 @@ export class CoursService {
         { entity: Enseignant, where: { cours: { idCours } }, label: (n) => `${n} enseignant(s)` },
         { entity: Evaluation, where: { cours: { idCours } }, label: (n) => `${n} note(s)` },
       ],
+      force,
       'Désactivez-le plutôt pour conserver l\'historique.',
     );
-    await this.coursRepository.remove(cours);
+    cours.isDelete = 1;
+    await this.coursRepository.save(cours);
     return { message: `Cours "${cours.libelle}" supprimé` };
   }
 
@@ -201,9 +192,10 @@ export class CoursService {
     return this.disciplineRepository.save(discipline);
   }
 
-  async removeDiscipline(ID: number): Promise<{ message: string }> {
+  async removeDiscipline(ID: number, force: boolean = false): Promise<{ message: string }> {
     const discipline = await this.findDisciplineById(ID);
-    await this.disciplineRepository.remove(discipline);
+    discipline.isDelete = 1;
+    await this.disciplineRepository.save(discipline);
     return { message: `Discipline "${discipline.libelle}" supprimée` };
   }
 
@@ -258,14 +250,16 @@ export class CoursService {
     return this.specialiteRepository.save(spe);
   }
 
-  async removeSpecialite(idSpecialite: number): Promise<{ message: string }> {
+  async removeSpecialite(idSpecialite: number, force: boolean = false): Promise<{ message: string }> {
     const spe = await this.findSpecialiteById(idSpecialite);
     await verifierAvantSuppression(
       this.specialiteRepository.manager,
       `la spécialité "${spe.libelle}"`,
       [{ entity: Livres, where: { specialite: { idSpecialite } }, label: (n) => `${n} livre(s)` }],
+      force
     );
-    await this.specialiteRepository.remove(spe);
+    spe.isDelete = 1;
+    await this.specialiteRepository.save(spe);
     return { message: `Spécialité "${spe.libelle}" supprimée` };
   }
 
@@ -358,7 +352,7 @@ export class CoursService {
     return this.livresRepository.save(livre);
   }
 
-  async removeLivre(idLivre: number): Promise<{ message: string }> {
+  async removeLivre(idLivre: number, force: boolean = false): Promise<{ message: string }> {
     const livre = await this.findLivreById(idLivre);
     await this.livresRepository.remove(livre);
     return { message: `Livre "${livre.titre}" supprimé` };

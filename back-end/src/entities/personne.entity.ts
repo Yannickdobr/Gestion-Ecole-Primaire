@@ -23,6 +23,9 @@ import { Admin } from './admin.entity';
  */
 @Entity('personne')
 export class Personne {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idPers: number;
 

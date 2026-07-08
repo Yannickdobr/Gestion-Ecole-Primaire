@@ -11,7 +11,8 @@ import {
 } from "@/lib/api";
 import { exporterCSV } from "@/lib/export";
 import FileUpload from "@/components/FileUpload";
-import { GraduationCap, Search, UserPlus, PowerOff, Power, X, Users, Repeat, Eye, Download, Trash2 } from "lucide-react";
+import { User, Users, GraduationCap, Building2, Eye, MapPin, Edit, Search, Plus, Trash2, X, Download, Shield, UserPlus, Repeat, Power, PowerOff } from "lucide-react";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 function Avatar({ prenom = "", nom = "" }) {
   const initiales = `${prenom[0] || ""}${nom[0] || ""}`.toUpperCase() || "?";
@@ -66,6 +67,7 @@ export default function StudentsPage() {
   const [envoi, setEnvoi] = useState(false);
   const [formErreur, setFormErreur] = useState("");
   const [seedEnCours, setSeedEnCours] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, impact: [], message: "" });
 
   // Modal "Réaffectation" (changement de classe/salle)
   const [reaff, setReaff] = useState(null); // l'élève concerné
@@ -195,15 +197,26 @@ export default function StudentsPage() {
     }
   };
 
-  const handleSupprimerEleve = async (eleve) => {
-    if (!window.confirm(`Voulez-vous vraiment supprimer l'élève ${eleve.prenom} ${eleve.nom} ? Cette action est irréversible.`)) return;
-    setBusyId(eleve.matricule);
+  const handleSupprimerEleve = (eleve) => {
+    setDeleteModal({ isOpen: true, item: eleve, impact: [], message: `Voulez-vous vraiment supprimer l'élève ${eleve.prenom} ${eleve.nom} ? Cette action est irréversible.` });
+  };
+
+  const executeDelete = async () => {
+    const { item, impact } = deleteModal;
+    const force = impact && impact.length > 0;
+    
+    setBusyId(item.matricule);
     setError("");
     try {
-      await deleteEleve(eleve.matricule);
+      await deleteEleve(item.matricule, force);
+      if (deleteModal.isOpen) setDeleteModal({ isOpen: false, item: null, impact: [], message: "" });
       await charger();
     } catch (err) {
-      setError(err.message || "Échec de la suppression.");
+      if (err.requireConfirmation) {
+         setDeleteModal({ ...deleteModal, impact: err.impact, message: err.message });
+      } else {
+         setError(err.message || "Échec de la suppression.");
+      }
     } finally {
       setBusyId(null);
     }
@@ -799,6 +812,14 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, item: null, impact: [], message: "" })}
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

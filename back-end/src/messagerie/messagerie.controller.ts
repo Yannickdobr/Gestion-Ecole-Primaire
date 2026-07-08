@@ -97,5 +97,5 @@ export class MessagerieController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer un brouillon (impossible si envoyé)' })
-  removeMessage(@Param('id', ParseIntPipe) id: number) { return this.messagerieService.removeMessage(id); }
+  removeMessage(@Param('id', ParseIntPipe) id: number, @Query('force') force?: string) { return this.messagerieService.removeMessage(id, force === 'true'); }
 }

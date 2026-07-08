@@ -13,6 +13,9 @@ import { Personne } from './personne.entity';
  */
 @Entity('rapport')
 export class Rapport {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idRap: number;
 

@@ -7,9 +7,12 @@ import {
   getEleves, getCours, getPersonnesTous, getNotesEleve, saisirNote,
   getAnnees, getTrimestres, getSessions, getNatures, getEpreuves,
   createAnnee, createTrimestre, createSession, createNature, createEpreuve,
+  updateAnnee, deleteAnnee, updateTrimestre, deleteTrimestre, updateSession, deleteSession,
+  updateNature, deleteNature, updateEpreuve, deleteEpreuve
 } from "@/lib/api";
-import { ClipboardCheck, Plus, X, Zap } from "lucide-react";
+import { ClipboardCheck, Plus, X, Zap, Edit2, Trash2 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 const inputStyle = { width: "100%", padding: "10px 13px", borderRadius: 10, border: "1.5px solid var(--surface-border)", fontSize: 14, fontFamily: "inherit", background: "#faf9f7", outline: "none", boxSizing: "border-box" };
 const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4a3728", marginBottom: 5 };
@@ -63,6 +66,49 @@ export default function GradesPage() {
   const [fSess, setFSess] = useState({ libelle: "", idTrimestre: "", idPers: "" });
   const [fNat, setFNat] = useState({ libelle: "" });
   const [fEpr, setFEpr] = useState({ libelle: "", idNature: "", idPers: "", urlDoc: "" });
+
+  const [editModal, setEditModal] = useState({ type: null, data: null });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: null, id: null, impact: [], message: "" });
+
+  const handleDelete = (type, id) => {
+    setDeleteModal({ isOpen: true, type, id, impact: [], message: "Voulez-vous vraiment supprimer cet élément ?" });
+  };
+
+  const executeDelete = async (type, id, force = false) => {
+    try {
+      if (type === 'annee') await deleteAnnee(id, force);
+      else if (type === 'trim') await deleteTrimestre(id, force);
+      else if (type === 'sess') await deleteSession(id, force);
+      else if (type === 'nat') await deleteNature(id, force);
+      else if (type === 'epr') await deleteEpreuve(id, force);
+      
+      if (deleteModal.isOpen) setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" });
+      await chargerTout();
+    } catch (e) {
+      if (e.requireConfirmation) {
+         setDeleteModal({ isOpen: true, type, id, impact: e.impact, message: e.message });
+      } else {
+         alert(e.message || "Erreur lors de la suppression.");
+      }
+    }
+  };
+
+  const submitEdit = async (e) => {
+    e.preventDefault();
+    if (!editModal.data) return;
+    setEnvoi(true); setError("");
+    try {
+      const { type, data } = editModal;
+      if (type === 'annee') await updateAnnee(data.idAnnee, { libelle: data.libelle, periode: data.periode });
+      else if (type === 'trim') await updateTrimestre(data.idTrimes, { libelle: data.libelle, periode: data.periode, idAca: Number(data.idAca) });
+      else if (type === 'sess') await updateSession(data.idSession, { libelle: data.libelle, idTrimestre: Number(data.idTrimestre), idPers: Number(data.idPers) });
+      else if (type === 'nat') await updateNature(data.idNature, { libelle: data.libelle });
+      else if (type === 'epr') await updateEpreuve(data.idEpreuve, { libelle: data.libelle, idNature: Number(data.idNature), idPers: Number(data.idPers), urlDoc: data.urlDoc });
+      setEditModal({ type: null, data: null });
+      await chargerTout();
+    } catch (err) { setError(err.message || "Erreur de modification."); }
+    finally { setEnvoi(false); }
+  };
 
   const chargerTout = useCallback(async () => {
     setError("");
@@ -190,6 +236,77 @@ export default function GradesPage() {
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
 
+      {/* 🔴🔴🔴 Modal d'édition des référentiels 🔴🔴🔴 */}
+      {editModal.data && (
+        <div onClick={() => !envoi && setEditModal({ type: null, data: null })} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 450, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>Modifier</h2>
+              <button onClick={() => !envoi && setEditModal({ type: null, data: null })} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={submitEdit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Field label="Libellé *">
+                <input style={inputStyle} value={editModal.data.libelle || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, libelle: e.target.value } }))} required />
+              </Field>
+              
+              {(editModal.type === 'annee' || editModal.type === 'trim') && (
+                <Field label="Période">
+                  <input style={inputStyle} value={editModal.data.periode || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, periode: e.target.value } }))} />
+                </Field>
+              )}
+
+              {editModal.type === 'trim' && (
+                <Field label="Année *">
+                  <select style={inputStyle} value={editModal.data.idAca || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idAca: e.target.value } }))} required>
+                    <option value="">— Choisir —</option>
+                    {annees.map((a) => <option key={a.idAnnee} value={a.idAnnee}>{a.libelle}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {editModal.type === 'sess' && (
+                <>
+                  <Field label="Trimestre *">
+                    <select style={inputStyle} value={editModal.data.idTrimestre || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idTrimestre: e.target.value } }))} required>
+                      <option value="">— Choisir —</option>
+                      {trimestres.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Responsable *">
+                    <select style={inputStyle} value={editModal.data.idPers || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idPers: e.target.value } }))} required>
+                      <option value="">— Choisir —</option>
+                      {personnes.map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
+                    </select>
+                  </Field>
+                </>
+              )}
+
+              {editModal.type === 'epr' && (
+                <>
+                  <Field label="Nature *">
+                    <select style={inputStyle} value={editModal.data.idNature || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idNature: e.target.value } }))} required>
+                      <option value="">— Choisir —</option>
+                      {natures.map((n) => <option key={n.idNature} value={n.idNature}>{n.libelle}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Auteur *">
+                    <select style={inputStyle} value={editModal.data.idPers || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idPers: e.target.value } }))} required>
+                      <option value="">— Choisir —</option>
+                      {personnes.map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
+                    </select>
+                  </Field>
+                </>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 4 }}>
+                <button type="button" onClick={() => setEditModal({ type: null, data: null })} disabled={envoi} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                <button type="submit" disabled={envoi} style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: envoi ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{envoi ? "Enregistrement…" : "Enregistrer"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── SAISIE ── */}
       {tab === "saisie" && (
         <>
@@ -265,7 +382,7 @@ export default function GradesPage() {
       {tab === "referentiels" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
           {/* Année */}
-          <RefCard title="Année académique" items={annees.map((a) => a.libelle)}>
+          <RefCard title="Année académique" items={annees} getLabel={a => a.libelle} onEdit={a => setEditModal({ type: 'annee', data: a })} onDelete={a => handleDelete('annee', a.idAnnee)}>
             <form onSubmit={addAnnee} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fAnnee.libelle} onChange={(e) => setFAnnee((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : 2025-2026" /></Field>
               <Field label="Période"><input style={inputStyle} value={fAnnee.periode} onChange={(e) => setFAnnee((s) => ({ ...s, periode: e.target.value }))} /></Field>
@@ -274,7 +391,7 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Trimestre */}
-          <RefCard title="Trimestre" items={trimestres.map((t) => t.libelle)}>
+          <RefCard title="Trimestre" items={trimestres} getLabel={t => t.libelle} onEdit={t => setEditModal({ type: 'trim', data: t })} onDelete={t => handleDelete('trim', t.idTrimes)}>
             <form onSubmit={addTrim} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fTrim.libelle} onChange={(e) => setFTrim((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : 1er Trimestre" /></Field>
               <Field label="Année *">
@@ -288,7 +405,7 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Session */}
-          <RefCard title="Session" items={sessions.map((s) => s.libelle)}>
+          <RefCard title="Session" items={sessions} getLabel={s => s.libelle} onEdit={s => setEditModal({ type: 'sess', data: s })} onDelete={s => handleDelete('sess', s.idSession)}>
             <form onSubmit={addSess} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fSess.libelle} onChange={(e) => setFSess((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : Session 1" /></Field>
               <Field label="Trimestre *">
@@ -308,7 +425,7 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Nature */}
-          <RefCard title="Nature d'épreuve" items={natures.map((n) => n.libelle)}>
+          <RefCard title="Nature d'épreuve" items={natures} getLabel={n => n.libelle} onEdit={n => setEditModal({ type: 'nat', data: n })} onDelete={n => handleDelete('nat', n.idNature)}>
             <form onSubmit={addNat} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fNat.libelle} onChange={(e) => setFNat({ libelle: e.target.value })} placeholder="ex : Composition" /></Field>
               <Btn envoi={envoi} />
@@ -316,7 +433,7 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Épreuve */}
-          <RefCard title="Épreuve" items={epreuves.map((e) => e.libelle)}>
+          <RefCard title="Épreuve" items={epreuves} getLabel={e => e.libelle} onEdit={e => setEditModal({ type: 'epr', data: e })} onDelete={e => handleDelete('epr', e.idEpreuve)}>
             <form onSubmit={addEpr} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fEpr.libelle} onChange={(e) => setFEpr((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : Compo Maths T1" /></Field>
               <Field label="Nature *">
@@ -387,17 +504,32 @@ export default function GradesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" })}
+        onConfirm={() => executeDelete(deleteModal.type, deleteModal.id, deleteModal.impact && deleteModal.impact.length > 0)}
+      />
     </div>
   );
 }
 
-function RefCard({ title, items, children }) {
+function RefCard({ title, items, getLabel, onEdit, onDelete, children }) {
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 18, padding: 20 }}>
       <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-dark)", marginBottom: 12 }}>{title} <span style={{ color: "var(--muted)", fontWeight: 500 }}>({items.length})</span></h3>
       {items.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-          {items.map((it, i) => <span key={i} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: "rgba(216,99,16,0.08)", color: "var(--orange)" }}>{it}</span>)}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 999, background: "rgba(216,99,16,0.08)", color: "var(--orange)" }}>
+              <span style={{ fontSize: 12 }}>{getLabel ? getLabel(it) : it}</span>
+              {onEdit && <button type="button" onClick={() => onEdit(it)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--orange)", padding: 0, marginLeft: 4, display: "flex", alignItems: "center" }} title="Modifier"><Edit2 size={12} /></button>}
+              {onDelete && <button type="button" onClick={() => onDelete(it)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 0, marginLeft: 4, display: "flex", alignItems: "center" }} title="Supprimer"><Trash2 size={12} /></button>}
+            </div>
+          ))}
         </div>
       )}
       {children}

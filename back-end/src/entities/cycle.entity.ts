@@ -7,6 +7,9 @@ import { Classe } from './classe.entity';
 
 @Entity('cycle')  // ✅ nom exact de la table SQL (casse)
 export class Cycle {
+
+  @Column({ type: 'smallint', default: 0, name: 'isDelete' })
+  isDelete: number;
   @PrimaryGeneratedColumn({ type: 'int' })
   idCycle: number;
 

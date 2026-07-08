@@ -8,7 +8,8 @@ import {
   envoyerMessage, envoyerMessageMasse, validerMessage, supprimerMessage, modifierMessage,
   getPersonnesTous, getEleves, getParentsEleve,
 } from "@/lib/api";
-import { MessageSquare, Plus, Check, Trash2, X, Send, Pencil } from "lucide-react";
+import { MessageSquare, Plus, Check, Trash2, X, Send, Pencil, Search, Filter } from "lucide-react";
+import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 
 const TYPES = { 0: "Individuel", 1: "Tous les parents", 2: "Paiement" };
 
@@ -40,6 +41,7 @@ export default function MessagesPage() {
   const [form, setForm] = useState(FORM_VIDE);
   const [envoi, setEnvoi] = useState(false);
   const [formErreur, setFormErreur] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, item: null, impact: [], message: "" });
   const [editMsg, setEditMsg] = useState(null); // brouillon en cours d'édition (null = nouveau)
 
   const charger = useCallback(async () => {
@@ -107,11 +109,20 @@ export default function MessagesPage() {
     finally { setBusyId(null); }
   };
 
-  const supprimer = async (m) => {
-    if (typeof window !== "undefined" && !window.confirm("Supprimer ce message ?")) return;
+  const supprimer = async (m, force = false) => {
     setBusyId(m.idMessages); setError("");
-    try { await supprimerMessage(m.idMessages); await charger(); }
-    catch (e) { setError(e.message || "Suppression impossible."); }
+    try { 
+      await supprimerMessage(m.idMessages, force); 
+      if (deleteModal.isOpen) setDeleteModal({ isOpen: false, item: null, impact: [], message: "" });
+      await charger(); 
+    }
+    catch (e) { 
+      if (e.requireConfirmation) {
+        setDeleteModal({ isOpen: true, item: m, impact: e.impact, message: e.message });
+      } else {
+        setError(e.message || "Suppression impossible."); 
+      }
+    }
     finally { setBusyId(null); }
   };
 
@@ -268,7 +279,7 @@ export default function MessagesPage() {
                       </button>
                     </>
                   )}
-                  <button onClick={() => supprimer(m)} disabled={busyId === m.idMessages} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  <button onClick={() => setDeleteModal({ isOpen: true, item: m, impact: [], message: "Voulez-vous vraiment supprimer ce message ?" })} disabled={busyId === m.idMessages} title="Supprimer" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -277,6 +288,15 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        title="Confirmation de suppression"
+        message={deleteModal.message}
+        impact={deleteModal.impact}
+        onClose={() => setDeleteModal({ isOpen: false, item: null, impact: [], message: "" })}
+        onConfirm={() => supprimer(deleteModal.item, deleteModal.impact && deleteModal.impact.length > 0)}
+      />
 
       {/* ── Modal composition ── */}
       {modalOuvert && (
