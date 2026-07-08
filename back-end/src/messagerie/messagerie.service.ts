@@ -10,7 +10,7 @@ import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto } from './dto/message
 import { MailService } from '../mail/mail.service';
 import { Frequente } from '../entities/frequente.entity';
 import { Admin } from '../entities/admin.entity';
-
+import { Titulaire } from '../entities/titulaire.entity';
 @Injectable()
 export class MessagerieService {
   constructor(
@@ -30,26 +30,43 @@ export class MessagerieService {
     return types[type] ?? 'Autre';
   }
 
-  async createMessage(dto: CreateMessageDto, user: { id: number; role: string }): Promise<Messages> {
-    // 🔒 L'expéditeur est TOUJOURS le compte connecté (impossible d'usurper)
-    if (user.role !== 'personne') {
-      throw new ForbiddenException("Seul un compte Personne (enseignant, scolarité…) peut envoyer un message.");
+  async createMessage(dto: CreateMessageDto, user: { id: number; role: string; typeRole?: number }): Promise<Messages> {
+    const manager = this.messagesRepository.manager;
+    let expediteur: Personne | null = null;
+    let prefixe = '';
+
+    if (user.role === 'personne') {
+      expediteur = await this.personneRepository.findOne({ where: { idPers: user.id, isDelete: 0 } });
     }
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id,
-        isDelete: 0
-    } });
-    if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
+    if (!expediteur && user.role === 'admin') {
+      const adm = await manager.findOne(Admin, { where: { ID: user.id } });
+      if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
+    }
+    if (!expediteur) {
+      expediteur = (await this.personneRepository.find({ where: { isDelete: 0 }, order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+    }
+    if (!expediteur) throw new NotFoundException('Aucune personne en base pour signer le message.');
 
     const destinataire = await this.parentsRepository.findOne({
-      where: { idParent: dto.idParent,
-          isDelete: 0
-    }, relations: ['personne'],
+      where: { idParent: dto.idParent, isDelete: 0 }, relations: ['personne', 'eleve'],
     });
     if (!destinataire) throw new NotFoundException(`Parent introuvable (idParent: ${dto.idParent})`);
 
+    if (user.role === 'personne' && user.typeRole === 1) { // 1 = ENSEIGNANT
+      const titulariats = await manager.find(Titulaire, { where: { personne: { idPers: user.id }, isDelete: 0 }, relations: ['salle'] });
+      const idSalles = titulariats.map(t => t.salle?.idSalle).filter(Boolean);
+      if (idSalles.length === 0) throw new ForbiddenException("Vous n'avez aucune classe assignée.");
+      
+      const isAllowed = await manager.count(Frequente, {
+        where: { eleve: { matricule: destinataire.eleve?.matricule }, salle: { idSalle: In(idSalles) }, isDelete: 0 }
+      });
+      if (isAllowed === 0) throw new ForbiddenException("Vous ne pouvez envoyer de message qu'aux parents de vos élèves.");
+    }
+
+    const information = prefixe + dto.information;
     const message = this.messagesRepository.create({
       objet: dto.objet,
-      information: dto.information,
+      information: information,
       type_message: dto.type_message ?? 0,
       AnneeAcade: dto.AnneeAcade ?? '',  // ✅ string directement
       valider: 0,
@@ -59,29 +76,49 @@ export class MessagerieService {
     return this.messagesRepository.save(message);
   }
 
-  async envoyerEnMasse(dto: EnvoiMasseDto, user: { id: number; role: string }): Promise<{ envoyes: number; erreurs: string[] }> {
-    // 🔒 L'expéditeur est TOUJOURS le compte connecté
-    if (user.role !== 'personne') {
-      throw new ForbiddenException("Seul un compte Personne peut envoyer un message.");
+  async envoyerEnMasse(dto: EnvoiMasseDto, user: { id: number; role: string; typeRole?: number }): Promise<{ envoyes: number; erreurs: string[] }> {
+    const manager = this.messagesRepository.manager;
+    let expediteur: Personne | null = null;
+    let prefixe = '';
+
+    if (user.role === 'personne') {
+      expediteur = await this.personneRepository.findOne({ where: { idPers: user.id, isDelete: 0 } });
     }
-    const expediteur = await this.personneRepository.findOne({ where: { idPers: user.id,
-        isDelete: 0
-    } });
-    if (!expediteur) throw new NotFoundException('Compte expéditeur introuvable');
+    if (!expediteur && user.role === 'admin') {
+      const adm = await manager.findOne(Admin, { where: { ID: user.id } });
+      if (adm?.nom) prefixe = `[Par ${adm.nom}] `;
+    }
+    if (!expediteur) {
+      expediteur = (await this.personneRepository.find({ where: { isDelete: 0 }, order: { idPers: 'ASC' }, take: 1 }))[0] ?? null;
+    }
+    if (!expediteur) throw new NotFoundException('Aucune personne en base pour signer le message.');
+
+    let idSalles: number[] = [];
+    if (user.role === 'personne' && user.typeRole === 1) { // 1 = ENSEIGNANT
+      const titulariats = await manager.find(Titulaire, { where: { personne: { idPers: user.id }, isDelete: 0 }, relations: ['salle'] });
+      idSalles = titulariats.map(t => t.salle?.idSalle).filter(Boolean);
+      if (idSalles.length === 0) throw new ForbiddenException("Vous n'avez aucune classe assignée.");
+    }
 
     let envoyes = 0;
     const erreurs: string[] = [];
+    const information = prefixe + dto.information;
 
     for (const idParent of dto.idParents) {
       const destinataire = await this.parentsRepository.findOne({
-        where: { idParent,
-            isDelete: 0
-        }, relations: ['personne'],
+        where: { idParent, isDelete: 0 }, relations: ['personne', 'eleve'],
       });
       if (!destinataire) { erreurs.push(`Parent id ${idParent} introuvable`); continue; }
 
+      if (user.role === 'personne' && user.typeRole === 1) {
+        const isAllowed = await manager.count(Frequente, {
+          where: { eleve: { matricule: destinataire.eleve?.matricule }, salle: { idSalle: In(idSalles) }, isDelete: 0 }
+        });
+        if (isAllowed === 0) { erreurs.push(`Parent id ${idParent} n'est pas lié à vos élèves`); continue; }
+      }
+
       const message = this.messagesRepository.create({
-        objet: dto.objet, information: dto.information,
+        objet: dto.objet, information: information,
         type_message: dto.type_message ?? 1,
         AnneeAcade: dto.AnneeAcade ?? '',
         valider: 1, expediteur, destinataire,
@@ -93,7 +130,7 @@ export class MessagerieService {
       const email = destinataire.personne?.username;
       if (email) {
         this.mail
-          .envoyer({ to: email, sujet: dto.objet, texte: dto.information })
+          .envoyer({ to: email, sujet: dto.objet, texte: information })
           .catch(() => undefined);
       }
     }
@@ -165,15 +202,29 @@ export class MessagerieService {
     return { envoyes, parents: liens.length };
   }
 
-  async findAll(): Promise<Messages[]> {
-    return this.messagesRepository.find({
+  async findAll(user?: { id: number; role: string; typeRole?: number }): Promise<Messages[]> {
+    let adminName: string | null = null;
+    if (user?.role === 'admin') {
+      const manager = this.messagesRepository.manager;
+      const adm = await manager.findOne(Admin, { where: { ID: user.id } });
+      adminName = adm?.nom || null;
+    }
+
+    const messages = await this.messagesRepository.find({
         where: { isDelete: 0 },
         relations: ['expediteur', 'destinataire', 'destinataire.personne'],
-      order: { created_at: 'DESC' },
+        order: { created_at: 'DESC' },
+    });
+
+    return messages.filter(msg => {
+      if (msg.valider === 1) return true; // Sent messages visible to all authorized
+      if (user?.role === 'personne') return msg.expediteur?.idPers === user.id;
+      if (user?.role === 'admin' && adminName) return msg.information.startsWith(`[Par ${adminName}] `);
+      return false;
     });
   }
 
-  async findEnvoyes(): Promise<Messages[]> {
+  async findEnvoyes(user?: { id: number; role: string; typeRole?: number }): Promise<Messages[]> {
     return this.messagesRepository.find({
       where: { valider: 1,
           isDelete: 0
@@ -183,13 +234,24 @@ export class MessagerieService {
     });
   }
 
-  async findBrouillons(): Promise<Messages[]> {
-    return this.messagesRepository.find({
-      where: { valider: 0,
-          isDelete: 0
-    },
+  async findBrouillons(user?: { id: number; role: string; typeRole?: number }): Promise<Messages[]> {
+    let adminName: string | null = null;
+    if (user?.role === 'admin') {
+      const manager = this.messagesRepository.manager;
+      const adm = await manager.findOne(Admin, { where: { ID: user.id } });
+      adminName = adm?.nom || null;
+    }
+
+    const brouillons = await this.messagesRepository.find({
+      where: { valider: 0, isDelete: 0 },
       relations: ['expediteur', 'destinataire', 'destinataire.personne'],
       order: { created_at: 'DESC' },
+    });
+
+    return brouillons.filter(msg => {
+      if (user?.role === 'personne') return msg.expediteur?.idPers === user.id;
+      if (user?.role === 'admin' && adminName) return msg.information.startsWith(`[Par ${adminName}] `);
+      return false;
     });
   }
 
@@ -209,8 +271,8 @@ export class MessagerieService {
    * - parent (Personne ayant des lignes Parents) → ses messages reçus (validés)
    * - autre personne (enseignant, scolarité, autres) → ses messages envoyés/brouillons
    */
-  async mesMessages(user: { id: number; role: string }): Promise<Messages[]> {
-    if (user?.role === 'admin') return this.findAll();
+  async mesMessages(user: { id: number; role: string; typeRole?: number }): Promise<Messages[]> {
+    if (user?.role === 'admin') return this.findAll(user);
 
     const lignesParent = await this.parentsRepository.find({
       where: { personne: { idPers: user.id },
@@ -271,11 +333,34 @@ export class MessagerieService {
     return msg;
   }
 
-  async updateMessage(idMessages: number, dto: UpdateMessageDto): Promise<Messages> {
+  async updateMessage(idMessages: number, dto: UpdateMessageDto, user?: { id: number; role: string; typeRole?: number }): Promise<Messages> {
     const msg = await this.findById(idMessages);
     if (msg.valider === 1) throw new BadRequestException('Impossible de modifier un message déjà envoyé.');
+    
+    // Vérification de propriété du brouillon
+    let isOwner = false;
+    let adminName: string | null = null;
+    if (user?.role === 'personne' && msg.expediteur?.idPers === user.id) isOwner = true;
+    if (user?.role === 'admin') {
+      const manager = this.messagesRepository.manager;
+      const adm = await manager.findOne(Admin, { where: { ID: user.id } });
+      adminName = adm?.nom || null;
+      if (adminName && msg.information.startsWith(`[Par ${adminName}] `)) isOwner = true;
+    }
+    
+    if (user && !isOwner) {
+      throw new ForbiddenException("Vous n'êtes pas l'auteur de ce brouillon, vous ne pouvez pas le modifier.");
+    }
+    
     if (dto.objet !== undefined) msg.objet = dto.objet;
-    if (dto.information !== undefined) msg.information = dto.information;
+    if (dto.information !== undefined) {
+      if (user?.role === 'admin' && adminName) {
+         const prefix = `[Par ${adminName}] `;
+         msg.information = dto.information.startsWith(prefix) ? dto.information : prefix + dto.information;
+      } else {
+         msg.information = dto.information;
+      }
+    }
     if (dto.type_message !== undefined) msg.type_message = dto.type_message;
     if (dto.AnneeAcade !== undefined) msg.AnneeAcade = dto.AnneeAcade;
     return this.messagesRepository.save(msg);

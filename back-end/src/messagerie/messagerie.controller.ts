@@ -18,15 +18,15 @@ export class MessagerieController {
 
   @Get()
   @ApiOperation({ summary: 'Tous les messages (admin)' })
-  findAll() { return this.messagerieService.findAll(); }
+  findAll(@Request() req) { return this.messagerieService.findAll(req.user); }
 
   @Get('envoyes')
   @ApiOperation({ summary: 'Messages validés et envoyés' })
-  findEnvoyes() { return this.messagerieService.findEnvoyes(); }
+  findEnvoyes(@Request() req) { return this.messagerieService.findEnvoyes(req.user); }
 
   @Get('brouillons')
   @ApiOperation({ summary: 'Brouillons non encore envoyés' })
-  findBrouillons() { return this.messagerieService.findBrouillons(); }
+  findBrouillons(@Request() req) { return this.messagerieService.findBrouillons(req.user); }
 
   @Get('stats')
   @ApiOperation({ summary: 'Statistiques : total, envoyés, brouillons, archivés, par type' })
@@ -63,13 +63,13 @@ export class MessagerieController {
   createMessage(@Request() req, @Body() dto: CreateMessageDto) { return this.messagerieService.createMessage(dto, req.user); }
 
   @Post('masse')
-  @Roles(...DIRECTION) // l'envoi groupé est réservé à la direction
+  @Roles(...DIRECTION, Role.ADMIN_STD, Role.ENSEIGNANT, ...PERSONNEL) // Permis à tout le personnel gérant les messages
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Envoyer le même message à plusieurs parents en une fois' })
   envoyerEnMasse(@Request() req, @Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto, req.user); }
 
   @Post('convocation-classe/:idSalle')
-  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL)
+  @Roles(...DIRECTION, Role.ADMIN_STD, Role.ENSEIGNANT, ...PERSONNEL)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Convoquer tous les parents des élèves d\'une classe (réunion parent-titulaire)' })
   convoquerParentsClasse(
@@ -82,7 +82,7 @@ export class MessagerieController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Modifier un brouillon (impossible si déjà envoyé)' })
-  updateMessage(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMessageDto) { return this.messagerieService.updateMessage(id, dto); }
+  updateMessage(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMessageDto) { return this.messagerieService.updateMessage(id, dto, req.user); }
 
   @Patch(':id/valider')
   @HttpCode(HttpStatus.OK)
