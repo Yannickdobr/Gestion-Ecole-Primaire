@@ -62,7 +62,7 @@ export class EmploiService {
     }, relations: ['personne', 'cours'] }),
       // La classe d'un enseignant vient du titulariat : idPers -> salle -> classe
       this.enseignantRepository.manager.find(Titulaire, {
-        where: { actif: 1 },
+        where: { actif: 1, isDelete: 0 },
         relations: ['personne', 'salle', 'salle.classe'],
       }),
     ]);
@@ -93,7 +93,50 @@ export class EmploiService {
       // Créneau « à problème » : la matière programmée = la matière de difficulté du titulaire
       if (A == null || DA == null || Number(c.cours?.idCours) !== DA) continue;
 
-      // Recherche automatique d'un partenaire B libre/compatible à la même heure
+      // 1. Recherche d'un enseignant totalement libre (qui n'a pas cours à cette heure)
+      let freeE: Enseignant | null = null;
+      for (const e of enseignants) {
+        if (Number(e.idEnseignant) === Number(A.idEnseignant)) continue;
+        
+        // E peut-il enseigner cette matière ?
+        const DE = difficulteDe(e);
+        if (DE != null && DE === DA) continue;
+        
+        // E est-il occupé ? (i.e. titulaire d'une classe qui a cours en ce moment)
+        let occupe = false;
+        for (const c2 of creneaux) {
+          if (c2.jour === c.jour && c2.heure === c.heure) {
+            const idC2 = Number(c2.classe?.idClasse);
+            const prof2 = profParClasse.get(idC2);
+            if (prof2 && Number(prof2.idEnseignant) === Number(e.idEnseignant)) {
+              occupe = true;
+              break;
+            }
+          }
+        }
+        
+        if (!occupe) {
+          freeE = e;
+          break;
+        }
+      }
+
+      if (freeE) {
+        plan.push({
+          jour: c.jour,
+          heure: c.heure,
+          classeConcernee: { idClasse: idClasseA, libelle: c.classe?.libelle },
+          matiereDifficulte: { idCours: DA, libelle: c.cours?.libelle },
+          enseignantEnDifficulte: info(A),
+          interimaire: info(freeE),
+          classeInterimaire: null, // Pas d'échange
+          matiereContrepartie: null, // Pas d'échange
+          conflit: false,
+        });
+        continue;
+      }
+
+      // 2. Recherche automatique d'un partenaire B libre/compatible à la même heure (Échange)
       let match: { B: Enseignant; cB: EmploiDuTemps; X: number } | null = null;
       for (const c2 of creneaux) {
         if (c2.idTemps === c.idTemps) continue;
@@ -136,7 +179,7 @@ export class EmploiService {
     
     // Pour trouver le titulaire de chaque classe
     const titulaires = await this.enseignantRepository.manager.find(Titulaire, {
-      where: { actif: 1 },
+      where: { actif: 1, isDelete: 0 },
       relations: ['personne', 'salle', 'salle.classe'],
     });
 

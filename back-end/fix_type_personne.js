@@ -24,7 +24,7 @@ async function main() {
     host: 'ecole-primaire-yannickakana134-92c2.d.aivencloud.com',
     port: 21707,
     user: 'avnadmin',
-    password: '******',
+    password: 'AVNS_Lj3wi4L3TKtUgW0ewM_',
     database: 'defaultdb',
     ssl: { rejectUnauthorized: false }
   };

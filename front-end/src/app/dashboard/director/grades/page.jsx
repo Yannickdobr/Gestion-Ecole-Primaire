@@ -8,7 +8,7 @@ import {
   getAnnees, getTrimestres, getSessions, getNatures, getEpreuves,
   createAnnee, createTrimestre, createSession, createNature, createEpreuve,
   updateAnnee, deleteAnnee, updateTrimestre, deleteTrimestre, updateSession, deleteSession,
-  updateNature, deleteNature, updateEpreuve, deleteEpreuve
+  updateNature, deleteNature, updateEpreuve, deleteEpreuve, updateNote, deleteNote
 } from "@/lib/api";
 import { ClipboardCheck, Plus, X, Zap, Edit2, Trash2 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
@@ -38,6 +38,8 @@ export default function GradesPage() {
   // « Saisi par » = le compte courant. Si c'est une personne (enseignant…),
   // on connaît son idPers ; si c'est un admin, le backend choisit un repli.
   const idPersCourant = user?.role === "personne" && user?.id ? Number(user.id) : undefined;
+  
+  const isDirOuFondateur = user?.role === "admin" && [0, 2, 3].includes(Number(user?.typeRole));
 
   const [tab, setTab] = useState("saisie"); // 'saisie' | 'referentiels'
   const [error, setError] = useState("");
@@ -81,6 +83,12 @@ export default function GradesPage() {
       else if (type === 'sess') await deleteSession(id, force);
       else if (type === 'nat') await deleteNature(id, force);
       else if (type === 'epr') await deleteEpreuve(id, force);
+      else if (type === 'note') {
+        await deleteNote(id, force);
+        if (deleteModal.isOpen) setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" });
+        await chargerNotes(matricule);
+        return;
+      }
       
       if (deleteModal.isOpen) setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" });
       await chargerTout();
@@ -104,6 +112,12 @@ export default function GradesPage() {
       else if (type === 'sess') await updateSession(data.idSession, { libelle: data.libelle, idTrimestre: Number(data.idTrimestre), idPers: Number(data.idPers), date_passage: data.date_passage || undefined });
       else if (type === 'nat') await updateNature(data.idNature, { libelle: data.libelle });
       else if (type === 'epr') await updateEpreuve(data.idEpreuve, { libelle: data.libelle, idNature: Number(data.idNature), idPers: Number(data.idPers), urlDoc: data.urlDoc });
+      else if (type === 'note') {
+        await updateNote(data.idEval, { note: Number(data.note), appreciation: data.appreciation.trim() || "RAS" });
+        setEditModal({ type: null, data: null });
+        await chargerNotes(matricule);
+        return;
+      }
       setEditModal({ type: null, data: null });
       await chargerTout();
     } catch (err) { setError(err.message || "Erreur de modification."); }
@@ -300,6 +314,16 @@ export default function GradesPage() {
                   </Field>
                 </>
               )}
+              {editModal.type === 'note' && (
+                <>
+                  <Field label="Note (/20) *">
+                    <input type="number" step="0.25" min="0" max="20" style={inputStyle} value={editModal.data.note} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, note: e.target.value } }))} required />
+                  </Field>
+                  <Field label="Appréciation">
+                    <input style={inputStyle} value={editModal.data.appreciation} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, appreciation: e.target.value } }))} placeholder="ex: Bon travail" />
+                  </Field>
+                </>
+              )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 4 }}>
                 <button type="button" onClick={() => setEditModal({ type: null, data: null })} disabled={envoi} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
@@ -361,10 +385,13 @@ export default function GradesPage() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 20, overflow: "hidden" }}>
             {!matricule ? <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Sélectionnez un élève pour voir et saisir ses notes.</div> : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Coef.</th><th style={thStyle}>Session</th><th style={thStyle}>Épreuve</th><th style={thStyle}>Note</th><th style={thStyle}>Appréciation</th></tr></thead>
+                <thead><tr><th style={thStyle}>Cours</th><th style={thStyle}>Coef.</th><th style={thStyle}>Session</th><th style={thStyle}>Épreuve</th><th style={thStyle}>Note</th><th style={thStyle}>Appréciation</th><th style={{...thStyle, textAlign: "right"}}>Action</th></tr></thead>
                 <tbody>
-                  {notes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={6}>Aucune note pour cet élève.</td></tr> :
-                    notes.map((n) => (
+                  {notes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={7}>Aucune note pour cet élève.</td></tr> :
+                    notes.map((n) => {
+                      const isAuteur = Number(n.idPers) === Number(idPersCourant);
+                      const peutEditer = isDirOuFondateur || isAuteur;
+                      return (
                       <tr key={n.idEval}>
                         <td style={{ ...tdStyle, fontWeight: 600 }}>{n.cours?.libelle || "—"}</td>
                         <td style={{ ...tdStyle, color: "var(--muted)" }}>{n.cours?.coefficient ?? 1}</td>
@@ -372,8 +399,18 @@ export default function GradesPage() {
                         <td style={{ ...tdStyle, color: "var(--muted)" }}>{n.epreuve?.libelle || "—"}</td>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{n.note}/20</td>
                         <td style={{ ...tdStyle, color: "var(--muted)" }}>{n.appreciation && n.appreciation !== "RAS" ? n.appreciation : "—"}</td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          <div style={{ display: "inline-flex", gap: 6 }}>
+                            {peutEditer && (
+                              <>
+                                <button onClick={() => setEditModal({ type: 'note', data: n })} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "var(--text-dark)", cursor: "pointer" }} title="Modifier"><Edit2 size={14} /></button>
+                                <button onClick={() => handleDelete('note', n.idEval)} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "#ef4444", cursor: "pointer" }} title="Supprimer"><Trash2 size={14} /></button>
+                              </>
+                            )}
+                          </div>
+                        </td>
                       </tr>
-                    ))}
+                    )})}
                 </tbody>
               </table>
             )}

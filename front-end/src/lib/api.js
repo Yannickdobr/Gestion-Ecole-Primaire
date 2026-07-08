@@ -141,6 +141,8 @@ export const getTitulaires = () => apiFetch("/professeurs/titulaires");
 export const getPersonnes = () => apiFetch("/professeurs/personnes");
 export const createPersonne = (data) =>
   apiFetch("/professeurs/personnes", { method: "POST", body: JSON.stringify(data) });
+export const updatePersonne = (id, data) =>
+  apiFetch(`/professeurs/personnes/${id}`, { method: "PUT", body: JSON.stringify(data) });
 export const deletePersonne = (id, force = false) =>
   apiFetch(`/professeurs/personnes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
 export const addParentToEleve = (matricule, data) =>
@@ -348,3 +350,22 @@ export const deleteNature = (id, force = false) =>
 export const updateEpreuve = (id, data) => apiFetch(`/evaluations/epreuves/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteEpreuve = (id, force = false) =>
   apiFetch(`/evaluations/epreuves/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+// --- Ajouts Suite Audit Fonctionnel ---
+export const updateNote = (id, data) => apiFetch(`/evaluations/notes/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteNote = (id, force = false) => apiFetch(`/evaluations/notes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+export const updateSpecialite = (id, data) => apiFetch(`/cours/specialites/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteSpecialite = (id, force = false) => apiFetch(`/cours/specialites/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+export const updateScolarite = (id, data) => apiFetch(`/paiements/scolarites/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteScolarite = (id, force = false) => apiFetch(`/paiements/scolarites/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+export const updateTranche = (id, data) => apiFetch(`/paiements/tranches/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteTranche = (id, force = false) => apiFetch(`/paiements/tranches/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+export const updatePaiement = (id, data) => apiFetch(`/paiements/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deletePaiement = (id, force = false) => apiFetch(`/paiements/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });
+
+export const updateModePaiement = (id, data) => apiFetch(`/paiements/modes/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteModePaiement = (id, force = false) => apiFetch(`/paiements/modes/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' });

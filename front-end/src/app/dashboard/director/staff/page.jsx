@@ -11,6 +11,7 @@ import {
   desactiverEnseignant,
   desactiverTitulaire,
   createPersonne,
+  updatePersonne,
   createEnseignant,
   createTitulaire,
   updateTitulaireSalle,
@@ -136,6 +137,10 @@ function StaffPage() {
 
   // Modal de restauration d'un ancien compte supprimé
   const [restoreModal, setRestoreModal] = useState({ isOpen: false, type: null, restoreId: null, ancienNom: "", message: "", pendingData: null });
+
+  // Modal d'édition des infos d'une personne
+  const [editPersonne, setEditPersonne] = useState(null);
+  const [editErreur, setEditErreur] = useState("");
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -453,9 +458,19 @@ function StaffPage() {
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.username}</td>
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{p.mobile && p.mobile !== "000" ? p.mobile : "—"}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
-                      <button onClick={() => setDeleteModal({ isOpen: true, item: p, type: 'personne', impact: [], message: `Voulez-vous vraiment supprimer le compte de ${p.prenom} ${p.nom} ?` })} disabled={busyId === `per-${p.idPers}`} title="Supprimer le membre" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                        <Trash2 size={14} /> {busyId === `per-${p.idPers}` ? "…" : "Supprimer"}
-                      </button>
+                      <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setEditPersonne({ ...p })}
+                          disabled={busyId === `per-${p.idPers}`}
+                          title="Modifier"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--text-dark)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          ✏️
+                        </button>
+                        <button onClick={() => setDeleteModal({ isOpen: true, item: p, type: 'personne', impact: [], message: `Voulez-vous vraiment supprimer le compte de ${p.prenom} ${p.nom} ?` })} disabled={busyId === `per-${p.idPers}`} title="Supprimer le membre" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "#ef4444", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Trash2 size={14} /> {busyId === `per-${p.idPers}` ? "…" : "Supprimer"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -525,14 +540,24 @@ function StaffPage() {
                     <td style={{ ...tdStyle, color: "var(--muted)" }}>{e.cours?.libelle || "Aucune"}</td>
                     <td style={tdStyle}><StatutBadge actif={e.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
-                      <button
-                        onClick={() => toggleEnseignant(e)}
-                        disabled={busyId === `ens-${e.idEnseignant}`}
-                        style={actionBtnStyle(Number(e.actif) === 1)}
-                      >
-                        {Number(e.actif) === 1 ? <PowerOff size={14} /> : <Power size={14} />}
-                        {busyId === `ens-${e.idEnseignant}` ? "…" : Number(e.actif) === 1 ? "Désactiver" : "Activer"}
-                      </button>
+                      <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setEditPersonne({ ...e.personne })}
+                          disabled={busyId === `ens-${e.idEnseignant}`}
+                          title="Modifier"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--text-dark)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => toggleEnseignant(e)}
+                          disabled={busyId === `ens-${e.idEnseignant}`}
+                          style={actionBtnStyle(Number(e.actif) === 1)}
+                        >
+                          {Number(e.actif) === 1 ? <PowerOff size={14} /> : <Power size={14} />}
+                          {busyId === `ens-${e.idEnseignant}` ? "…" : Number(e.actif) === 1 ? "Désactiver" : "Activer"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -573,6 +598,14 @@ function StaffPage() {
                     <td style={tdStyle}><StatutBadge actif={tit.actif} /></td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setEditPersonne({ ...tit.personne })}
+                          disabled={busyId === `tit-${tit.idTitulaire}`}
+                          title="Modifier"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--text-dark)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          ✏️
+                        </button>
                         <button
                           onClick={() => { setTitEdit(tit); setTitEditSalle(tit.salle?.idSalle ? String(tit.salle.idSalle) : ""); setTitEditErr(""); }}
                           disabled={busyId === `tit-${tit.idTitulaire}`}
@@ -780,8 +813,9 @@ function StaffPage() {
                       setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
                       setAdmins(await getAdmins());
                     } else {
-                      const personne = await createPersonne(data);
-                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours ? data.idCours : undefined, idAdmin });
+                      const { idCours, ...personneData } = data;
+                      const personne = await createPersonne(personneData);
+                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: idCours ? idCours : undefined, idAdmin });
                       setModalOuvert(false); setForm(STAFF_VIDE);
                       await charger();
                     }
@@ -800,8 +834,9 @@ function StaffPage() {
                       setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
                       setAdmins(await getAdmins());
                     } else {
-                      const personne = await createPersonne(data);
-                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours ? data.idCours : undefined, idAdmin });
+                      const { idCours, ...personneData } = data;
+                      const personne = await createPersonne(personneData);
+                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: idCours ? idCours : undefined, idAdmin });
                       setModalOuvert(false); setForm(STAFF_VIDE);
                       await charger();
                     }
@@ -814,6 +849,49 @@ function StaffPage() {
           </div>
         </div>
       )}
+
+      {editPersonne && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)" }}>
+          <div style={{ background: "white", padding: 32, borderRadius: 24, width: 440, maxWidth: "90%", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h3 style={{ margin: 0, fontSize: 18, color: "var(--text-dark)", fontWeight: 700 }}>Modifier les informations</h3>
+              <button onClick={() => setEditPersonne(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }}><X size={20} /></button>
+            </div>
+            {editErreur && (
+              <div style={{ padding: "10px 14px", marginBottom: 16, borderRadius: 10, background: "rgba(239,68,68,0.08)", color: "#dc2626", fontSize: 13 }}>{editErreur}</div>
+            )}
+            <form onSubmit={soumettreEdit}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label style={labelStyle}>Prénom</label>
+                  <input type="text" style={inputStyle} value={editPersonne.prenom || ""} onChange={e => setEditPersonne({ ...editPersonne, prenom: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={labelStyle}>Nom</label>
+                  <input type="text" style={inputStyle} value={editPersonne.nom || ""} onChange={e => setEditPersonne({ ...editPersonne, nom: e.target.value })} required />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div>
+                  <label style={labelStyle}>Mobile (obligatoire)</label>
+                  <input type="text" style={inputStyle} value={editPersonne.mobile || ""} onChange={e => setEditPersonne({ ...editPersonne, mobile: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={labelStyle}>Téléphone 2 (optionnel)</label>
+                  <input type="text" style={inputStyle} value={editPersonne.phone || ""} onChange={e => setEditPersonne({ ...editPersonne, phone: e.target.value })} />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setEditPersonne(null)} style={{ padding: "11px 20px", borderRadius: 10, border: "1.5px solid var(--surface-border)", background: "white", color: "#555", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+                <button type="submit" disabled={envoi} style={{ padding: "11px 20px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", opacity: envoi ? 0.7 : 1 }}>
+                  {envoi ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

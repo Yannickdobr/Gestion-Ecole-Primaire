@@ -6,11 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useActiveYear } from "@/context/ActiveYearContext";
 import { imprimerRecu } from "@/lib/print";
 import {
-  getEleves, getPaiementsEleve, getModes, createModePaiement,
-  getScolarites, createScolarite, createTranche, enregistrerPaiement, getArrieresAuto,
+  getEleves, getPaiementsEleve, getModes, createModePaiement, updateModePaiement, deleteModePaiement,
+  getScolarites, createScolarite, updateScolarite, deleteScolarite, createTranche, updateTranche, deleteTranche, enregistrerPaiement, updatePaiement, deletePaiement, getArrieresAuto,
   getCycles, getAnnees, getPersonnesTous, envoyerRappelsImpayes,
 } from "@/lib/api";
-import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock, Printer, FileText, BellRing } from "lucide-react";
+import { CreditCard, Wallet, Plus, Receipt, GraduationCap, X, CalendarClock, Printer, FileText, BellRing, Edit2, Trash2 } from "lucide-react";
+import React from "react";
 import BilanClasse from "./BilanClasse";
 
 const thStyle = { padding: "12px 20px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -68,6 +69,58 @@ export default function PaymentsPage() {
 
   // Modes
   const [nouveauMode, setNouveauMode] = useState({ libelle: "", information: "" });
+
+  const [editModal, setEditModal] = useState({ type: null, data: null });
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, type: null, id: null, impact: [], message: "" });
+
+  const handleDelete = (type, id) => {
+    setDeleteModal({ isOpen: true, type, id, impact: [], message: "Voulez-vous vraiment supprimer cet élément ?" });
+  };
+
+  const executeDelete = async (type, id, force = false) => {
+    try {
+      if (type === 'paiement') await deletePaiement(id, force);
+      else if (type === 'scolarite') await deleteScolarite(id, force);
+      else if (type === 'tranche') await deleteTranche(id, force);
+      else if (type === 'mode') await deleteModePaiement(id, force);
+      
+      if (deleteModal.isOpen) setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" });
+      
+      if (type === 'paiement') await rafraichirEleve(matricule, idAca);
+      else if (type === 'mode') setModes(await getModes());
+      else if (type === 'scolarite' || type === 'tranche') setScolarites(await getScolarites());
+    } catch (e) {
+      if (e.requireConfirmation) {
+         setDeleteModal({ isOpen: true, type, id, impact: e.impact, message: e.message });
+      } else {
+         alert(e.message || "Erreur lors de la suppression.");
+      }
+    }
+  };
+
+  const submitEdit = async (e) => {
+    e.preventDefault();
+    if (!editModal.data) return;
+    setEnvoi(true); setError("");
+    try {
+      const { type, data } = editModal;
+      if (type === 'paiement') {
+        await updatePaiement(data.idPaie, { montant: Number(data.montant), commentaire: data.commentaire });
+        await rafraichirEleve(matricule, idAca);
+      } else if (type === 'scolarite') {
+        await updateScolarite(data.idScolarite, { inscription: Number(data.inscription), pension: Number(data.pension) });
+        setScolarites(await getScolarites());
+      } else if (type === 'tranche') {
+        await updateTranche(data.idTranche, { libelle: data.libelle, montant: Number(data.montant) });
+        setScolarites(await getScolarites());
+      } else if (type === 'mode') {
+        await updateModePaiement(data.idMode, { libelle: data.libelle, information: data.information });
+        setModes(await getModes());
+      }
+      setEditModal({ type: null, data: null });
+    } catch (err) { setError(err.message || "Erreur de modification."); }
+    finally { setEnvoi(false); }
+  };
 
   const chargerRef = useCallback(async () => {
     try {
@@ -180,6 +233,9 @@ export default function PaymentsPage() {
 
   // Définition des frais réservée au Fondateur (2) — et au Root (0) super-admin
   const estFondateur = user?.role === "admin" && [0, 2].includes(Number(user?.typeRole));
+  // Édition des paiements et des modes de paiements ouverte à tout l'administratif (y compris scolarité)
+  const peutGererPaiement = user?.role === "admin";
+
   const tabs = [
     { key: "versements", label: "Versements", icon: <Receipt size={16} /> },
     { key: "bilan", label: "Bilan par Classe", icon: <FileText size={16} /> },
@@ -210,6 +266,70 @@ export default function PaymentsPage() {
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
+
+      {/* Modal suppression */}
+      {deleteModal.isOpen && (
+        <div onClick={() => setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" })} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 450, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, color: "#ef4444", fontFamily: "var(--font-display)", marginBottom: 16 }}>Confirmation requise</h2>
+            <p style={{ fontSize: 15, color: "var(--text-dark)", marginBottom: 16 }}>{deleteModal.message}</p>
+            {deleteModal.impact && deleteModal.impact.length > 0 && (
+              <div style={{ background: "rgba(239,68,68,0.05)", padding: 12, borderRadius: 10, border: "1px solid rgba(239,68,68,0.1)", marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>Impacts de la suppression :</div>
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "#dc2626" }}>
+                  {deleteModal.impact.map((imp, idx) => <li key={idx}>{imp}</li>)}
+                </ul>
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <button onClick={() => setDeleteModal({ isOpen: false, type: null, id: null, impact: [], message: "" })} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Annuler</button>
+              <button onClick={() => executeDelete(deleteModal.type, deleteModal.id, true)} style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: "#ef4444", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Forcer la suppression</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal édition */}
+      {editModal.data && (
+        <div onClick={() => !envoi && setEditModal({ type: null, data: null })} style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 450, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)" }}>Modifier</h2>
+              <button onClick={() => !envoi && setEditModal({ type: null, data: null })} style={{ background: "none", border: "none", cursor: "pointer", color: "#8a7060" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={submitEdit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {editModal.type === 'paiement' && (
+                <>
+                  <div><label style={labelStyle}>Montant *</label><input type="number" min="0" style={inputStyle} value={editModal.data.montant} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, montant: e.target.value } }))} required /></div>
+                  <div><label style={labelStyle}>Commentaire</label><input style={inputStyle} value={editModal.data.commentaire} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, commentaire: e.target.value } }))} placeholder="ex: Frais annexe" /></div>
+                </>
+              )}
+              {editModal.type === 'scolarite' && (
+                <>
+                  <div><label style={labelStyle}>Inscription *</label><input type="number" min="0" style={inputStyle} value={editModal.data.inscription} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, inscription: e.target.value } }))} required /></div>
+                  <div><label style={labelStyle}>Pension *</label><input type="number" min="0" style={inputStyle} value={editModal.data.pension} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, pension: e.target.value } }))} required /></div>
+                </>
+              )}
+              {editModal.type === 'tranche' && (
+                <>
+                  <div><label style={labelStyle}>Libellé *</label><input style={inputStyle} value={editModal.data.libelle} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, libelle: e.target.value } }))} required /></div>
+                  <div><label style={labelStyle}>Montant *</label><input type="number" min="0" style={inputStyle} value={editModal.data.montant} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, montant: e.target.value } }))} required /></div>
+                </>
+              )}
+              {editModal.type === 'mode' && (
+                <>
+                  <div><label style={labelStyle}>Libellé *</label><input style={inputStyle} value={editModal.data.libelle} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, libelle: e.target.value } }))} required /></div>
+                  <div><label style={labelStyle}>Information</label><input style={inputStyle} value={editModal.data.information} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, information: e.target.value } }))} /></div>
+                </>
+              )}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 4 }}>
+                <button type="button" onClick={() => setEditModal({ type: null, data: null })} disabled={envoi} style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Annuler</button>
+                <button type="submit" disabled={envoi} style={{ padding: "10px 22px", borderRadius: 10, border: "none", background: envoi ? "rgba(216,99,16,0.6)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: envoi ? "not-allowed" : "pointer", fontFamily: "inherit" }}>{envoi ? "Enregistrement…" : "Enregistrer"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── BILAN PAR CLASSE ── */}
       {tab === "bilan" && <BilanClasse anneeId={idAca} />}
@@ -302,9 +422,9 @@ export default function PaymentsPage() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 20, overflow: "hidden" }}>
             {!matricule ? <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>Sélectionnez un élève pour voir ses versements.</div> : (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Montant</th><th style={thStyle}>Mode</th><th style={thStyle}>Commentaire</th><th style={{ ...thStyle, textAlign: "right" }}>Reçu</th></tr></thead>
+                <thead><tr><th style={thStyle}>Date</th><th style={thStyle}>Montant</th><th style={thStyle}>Mode</th><th style={thStyle}>Commentaire</th><th style={{ ...thStyle, textAlign: "right" }}>Reçu</th><th style={{ ...thStyle, textAlign: "right" }}>Action</th></tr></thead>
                 <tbody>
-                  {paiements.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={5}>Aucun versement.</td></tr> :
+                  {paiements.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={6}>Aucun versement.</td></tr> :
                     paiements.map((p) => (
                       <tr key={p.idPaie}>
                         <td style={tdStyle}>{formatDate(p.datePaie)}</td>
@@ -320,6 +440,14 @@ export default function PaymentsPage() {
                             <Printer size={13} /> Reçu
                           </button>
                         </td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          {peutGererPaiement && (
+                            <div style={{ display: "inline-flex", gap: 6 }}>
+                              <button onClick={() => setEditModal({ type: 'paiement', data: { ...p, commentaire: p.commentaire === "INDEFINI" ? "" : p.commentaire } })} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "var(--text-dark)", cursor: "pointer" }} title="Modifier"><Edit2 size={14} /></button>
+                              <button onClick={() => handleDelete('paiement', p.idPaie)} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "#ef4444", cursor: "pointer" }} title="Supprimer"><Trash2 size={14} /></button>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                 </tbody>
@@ -334,16 +462,38 @@ export default function PaymentsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 20, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Cycle</th><th style={thStyle}>Inscription</th><th style={thStyle}>Pension</th><th style={thStyle}>Tranches</th></tr></thead>
+              <thead><tr><th style={thStyle}>Cycle</th><th style={thStyle}>Inscription</th><th style={thStyle}>Pension</th><th style={thStyle}>Tranches</th><th style={{...thStyle, textAlign: "right"}}>Action</th></tr></thead>
               <tbody>
-                {scolarites.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={4}>Aucune scolarité définie.</td></tr> :
+                {scolarites.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={5}>Aucune scolarité définie.</td></tr> :
                   scolarites.map((s) => (
-                    <tr key={s.idScolarite}>
-                      <td style={{ ...tdStyle, fontWeight: 600 }}>{s.cycle?.libelle || "—"}</td>
-                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{fmt(s.inscription)}</td>
-                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{fmt(s.pension)}</td>
-                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{(s.tranches || []).length}</td>
-                    </tr>
+                    <React.Fragment key={s.idScolarite}>
+                      <tr>
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>{s.cycle?.libelle || "—"}</td>
+                        <td style={{ ...tdStyle, color: "var(--muted)" }}>{fmt(s.inscription)}</td>
+                        <td style={{ ...tdStyle, color: "var(--muted)" }}>{fmt(s.pension)}</td>
+                        <td style={{ ...tdStyle }}>
+                          {s.tranches && s.tranches.length > 0 ? s.tranches.map((t) => (
+                            <div key={t.idTranche} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                              <span style={{ fontSize: 13, color: "var(--muted)" }}>{t.libelle} ({fmt(t.montant)})</span>
+                              {estFondateur && (
+                                <div style={{ display: "flex", gap: 4 }}>
+                                  <button onClick={() => setEditModal({ type: 'tranche', data: t })} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-dark)", padding: 0 }} title="Modifier tranche"><Edit2 size={13} /></button>
+                                  <button onClick={() => handleDelete('tranche', t.idTranche)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 0 }} title="Supprimer tranche"><Trash2 size={13} /></button>
+                                </div>
+                              )}
+                            </div>
+                          )) : <span style={{ color: "var(--muted)", fontSize: 13 }}>0</span>}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                          {estFondateur && (
+                            <div style={{ display: "inline-flex", gap: 6 }}>
+                              <button onClick={() => setEditModal({ type: 'scolarite', data: s })} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "var(--text-dark)", cursor: "pointer" }} title="Modifier scolarité"><Edit2 size={14} /></button>
+                              <button onClick={() => handleDelete('scolarite', s.idScolarite)} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "#ef4444", cursor: "pointer" }} title="Supprimer scolarité"><Trash2 size={14} /></button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    </React.Fragment>
                   ))}
               </tbody>
             </table>
@@ -399,11 +549,24 @@ export default function PaymentsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
           <div style={{ background: "var(--surface)", border: "1px solid var(--surface-border)", borderRadius: 20, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr><th style={thStyle}>Mode</th><th style={thStyle}>Information</th></tr></thead>
+              <thead><tr><th style={thStyle}>Mode</th><th style={thStyle}>Information</th><th style={{...thStyle, textAlign: "right"}}>Action</th></tr></thead>
               <tbody>
-                {modes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={2}>Aucun mode.</td></tr> :
+                {modes.length === 0 ? <tr><td style={{ ...tdStyle, textAlign: "center", color: "var(--muted)" }} colSpan={3}>Aucun mode.</td></tr> :
                   modes.map((m) => (
-                    <tr key={m.idMode}><td style={{ ...tdStyle, fontWeight: 600 }}>{m.libelle}</td><td style={{ ...tdStyle, color: "var(--muted)" }}>{m.information && m.information !== "INDEFINI" ? m.information : "—"}</td></tr>
+                    <tr key={m.idMode}>
+                      <td style={{ ...tdStyle, fontWeight: 600 }}>{m.libelle}</td>
+                      <td style={{ ...tdStyle, color: "var(--muted)" }}>{m.information && m.information !== "INDEFINI" ? m.information : "—"}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", gap: 6 }}>
+                          {peutGererPaiement && (
+                            <button onClick={() => setEditModal({ type: 'mode', data: { ...m, information: m.information === "INDEFINI" ? "" : m.information } })} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "var(--text-dark)", cursor: "pointer" }} title="Modifier mode"><Edit2 size={14} /></button>
+                          )}
+                          {peutGererPaiement && (
+                            <button onClick={() => handleDelete('mode', m.idMode)} style={{ padding: 6, borderRadius: 8, border: "1px solid var(--surface-border)", background: "white", color: "#ef4444", cursor: "pointer" }} title="Supprimer mode"><Trash2 size={14} /></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
                   ))}
               </tbody>
             </table>
