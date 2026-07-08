@@ -127,6 +127,62 @@ export class EmploiService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // ENRICHISSEMENT INTERIM POUR L'EMPLOI DU TEMPS
+  // ══════════════════════════════════════════════════════════════════════════
+  async enrichirAvecInterim(creneaux: EmploiDuTemps[]): Promise<any[]> {
+    if (!creneaux || creneaux.length === 0) return [];
+
+    const planGlobal = await this.planInterim();
+    
+    // Pour trouver le titulaire de chaque classe
+    const titulaires = await this.enseignantRepository.manager.find(Titulaire, {
+      where: { actif: 1 },
+      relations: ['personne', 'salle', 'salle.classe'],
+    });
+
+    const profParClasse = new Map<number, any>();
+    for (const t of titulaires) {
+      if (t.salle?.classe?.idClasse && t.personne) {
+        profParClasse.set(Number(t.salle.classe.idClasse), {
+          idEnseignant: t.personne.idPers, // idPers ou idEnseignant ? On renvoie nom/prenom surtout
+          idPers: t.personne.idPers,
+          nom: t.personne.nom,
+          prenom: t.personne.prenom,
+        });
+      }
+    }
+
+    return creneaux.map(c => {
+      const idClasse = Number(c.classe?.idClasse);
+      const res: any = { ...c };
+
+      const titulaire = profParClasse.get(idClasse);
+      res.enseignantEffectif = titulaire || null;
+      res.coursEffectif = c.cours;
+      res.estInterim = false;
+
+      // Chercher si ce créneau est modifié par le plan d'intérim
+      const swap = planGlobal.find(p => p.jour === c.jour && p.heure === c.heure && !p.conflit && 
+        (p.classeConcernee.idClasse === idClasse || p.classeInterimaire?.idClasse === idClasse)
+      );
+
+      if (swap) {
+        if (swap.classeConcernee.idClasse === idClasse) {
+          // La classe A reçoit l'intérimaire B au lieu du titulaire A
+          res.enseignantEffectif = swap.interimaire;
+          res.estInterim = true;
+        } else if (swap.classeInterimaire?.idClasse === idClasse) {
+          // La classe B (celle de l'intérimaire) reçoit le titulaire A, avec la matière de contrepartie
+          res.enseignantEffectif = swap.enseignantEnDifficulte;
+          res.coursEffectif = swap.matiereContrepartie; // objet { idCours, libelle }
+          res.estInterim = true;
+        }
+      }
+      return res;
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // JOURS DE SEMAINE
   // ══════════════════════════════════════════════════════════════════════════
 
@@ -192,7 +248,6 @@ export class EmploiService {
       where: { idCours: dto.idCours,
           isDelete: 0
     },
-      relations: ['classe'],
     });
     if (!cours) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
 
@@ -257,12 +312,14 @@ export class EmploiService {
     });
 
     // Tri métier en mémoire sur l'ordre logique des jours
-    return creneaux.sort((a, b) => {
+    const sorted = creneaux.sort((a, b) => {
       const indexA = ordreJours.indexOf(a.jour);
       const indexB = ordreJours.indexOf(b.jour);
       if (indexA !== indexB) return indexA - indexB;
       return a.heure.localeCompare(b.heure);
     });
+    
+    return this.enrichirAvecInterim(sorted);
   }
 
   async findByCours(idCours: number): Promise<EmploiDuTemps[]> {
@@ -279,22 +336,25 @@ export class EmploiService {
       order: { heure: 'ASC' },
     });
 
-    return creneaux.sort((a, b) => {
+    const sorted = creneaux.sort((a, b) => {
       const indexA = ordreJours.indexOf(a.jour);
       const indexB = ordreJours.indexOf(b.jour);
       if (indexA !== indexB) return indexA - indexB;
       return a.heure.localeCompare(b.heure);
     });
+    
+    return this.enrichirAvecInterim(sorted);
   }
 
   async findByJour(jour: string): Promise<EmploiDuTemps[]> {
-    return this.emploiRepository.find({
+    const creneaux = await this.emploiRepository.find({
       where: { jour,
           isDelete: 0
     },
       relations: ['classe', 'cours'],
       order: { heure: 'ASC' },
     });
+    return this.enrichirAvecInterim(creneaux);
   }
 
   async findAll(): Promise<EmploiDuTemps[]> {
@@ -308,12 +368,14 @@ export class EmploiService {
       order: { heure: 'ASC' },
     });
 
-    return creneaux.sort((a, b) => {
+    const sorted = creneaux.sort((a, b) => {
       const indexA = ordreJours.indexOf(a.jour);
       const indexB = ordreJours.indexOf(b.jour);
       if (indexA !== indexB) return indexA - indexB;
       return a.heure.localeCompare(b.heure);
     });
+    
+    return this.enrichirAvecInterim(sorted);
   }
 
   async findCreneauById(idTemps: number): Promise<EmploiDuTemps> {

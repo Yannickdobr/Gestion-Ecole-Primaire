@@ -38,7 +38,7 @@ export class ProfesseursController {
   }
 
   @Get('personnes')
-  @ApiOperation({ summary: 'Lister tous les enseignants (Personnes typePersonne=2)' })
+  @ApiOperation({ summary: 'Lister tous les enseignants (Personnes typePersonne=1)' })
   findAllPersonnes() { return this.professeursService.findAllPersonnes(); }
 
   @Get('personnes/search')

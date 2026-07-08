@@ -84,9 +84,12 @@ const adaptEmploi = (rows = []) =>
     duree: 90,
     idClasse: e.classe?.idClasse,
     idCours: e.cours?.idCours,
-    idPers: null,
+    idPers: e.enseignantEffectif?.idPers || e.enseignantEffectif?.idEnseignant || null,
     idSalle: null,
     status: 'normal',
+    estInterim: e.estInterim || false,
+    enseignantEffectif: e.enseignantEffectif,
+    coursEffectif: e.coursEffectif,
   }));
 
 // ── Constants ─────────────────────────────────────────────
@@ -205,9 +208,9 @@ function BreakBand({ label, style = {} }) {
 function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
   const [hovered, setHovered] = useState(false);
   const { coursMap, classeMap, enseignMap, salleMap } = lookups;
-  const cours = coursMap[slot.idCours];
+  const cours = slot.coursEffectif || coursMap[slot.idCours];
   const classe = classeMap[slot.idClasse];
-  const enseignant = enseignMap[slot.idPers];
+  const enseignant = slot.enseignantEffectif || enseignMap[slot.idPers];
   const salle = salleMap[slot.idSalle];
   const meta = STATUS_META[slot.status] || STATUS_META.normal;
   const subjectColor = cours?.couleur || DEPT_COLORS.default;
@@ -221,7 +224,7 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
   const isConflict = slot.status === 'conflit';
   const isAnnule = slot.status === 'annule';
   const isExamen = slot.status === 'examen';
-  const isInterim = slot.swapRole === 'B';
+  const isInterim = slot.estInterim;
 
   return (
     <div
@@ -275,12 +278,12 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             textDecoration: isAnnule ? 'line-through' : 'none',
           }}>
-            {isInterim ? slot.matiere : (cours?.libelle || t.no_subject)}
+            {isInterim ? (cours?.libelle || t.no_subject) : (cours?.libelle || t.no_subject)}
           </div>
           
           {isInterim ? (
             <div style={{ fontSize: 10.5, color: "#4f67ff", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
-              <Repeat size={11} /> intérim · classe {slot.targetClasse}
+              <Repeat size={11} /> intérim {viewMode !== 'class' && classe ? `· classe ${classe.libelle}` : ''}
             </div>
           ) : (
             <div style={{ fontSize: 11, color: '#8a7060', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -675,31 +678,7 @@ export default function SchedulePage() {
       return emploi.filter(s => String(s.idClasse) === selectedFilter);
     }
     if (viewMode === 'teacher') {
-      const t = titulaires.find(tt => String(tt.personne?.idPers) === selectedFilter && Number(tt.actif) === 1);
-      const idC = t?.salle?.classe?.idClasse;
-      const teacher = enseignants.find(e => String(e.idPers) === selectedFilter);
-      
-      let slots = [];
-      if (idC) {
-        slots = emploi.filter(s => {
-          if (Number(s.idClasse) !== Number(idC)) return false;
-          // Retirer si remplacé sur ce créneau (Rôle A dans le plan)
-          const sw = plan.find(p => p.jour === s.jour && String(p.heure).padStart(5, '0') === String(s.heure).padStart(5, '0') && Number(p.enseignantEnDifficulte?.idEnseignant) === Number(teacher?.idEnseignant));
-          if (sw) return false;
-          return true;
-        });
-      }
-      
-      // Ajouter les créneaux où il intervient comme intérimaire (Rôle B)
-      const interims = plan.filter(p => Number(p.interimaire?.idEnseignant) === Number(teacher?.idEnseignant));
-      for (const p of interims) {
-        const h = String(p.heure).padStart(5, '0');
-        const s = emploi.find(em => em.jour === p.jour && String(em.heure).padStart(5, '0') === h && Number(em.idClasse) === Number(p.classeInterimaire?.idClasse));
-        if (s) {
-          slots.push({ ...s, swapRole: 'B', matiere: p.matiereContrepartie?.libelle, targetClasse: p.classeInterimaire?.libelle });
-        }
-      }
-      return slots;
+      return emploi.filter(s => String(s.idPers) === selectedFilter);
     }
     if (viewMode === 'room') {
       const salle = salles.find(s => String(s.idSalle) === selectedFilter);

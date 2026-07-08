@@ -145,7 +145,7 @@ export class ProfesseursService {
         nomComplet: `${dto.prenom} ${dto.nom}`,
         username: dto.username,
         motDePasse: motDePasseClair,
-        role: LIBELLE_TYPE[dto.typePersonne ?? 2] ?? 'Personnel',
+        role: LIBELLE_TYPE[dto.typePersonne ?? 1] ?? 'Personnel',
       });
       (saved as any).emailEnvoye = emailEnvoye;
       (saved as any).restored = true;
@@ -191,7 +191,7 @@ export class ProfesseursService {
       lieuNaissance: dto.lieuNaissance ?? 'INDEFINI',
       mobile: dto.mobile ?? '000',
       phone: dto.phone ?? '000',
-      typePersonne: dto.typePersonne ?? 2, // défaut : 2 = Professeur
+      typePersonne: dto.typePersonne ?? 1, // défaut : 1 = Enseignant
       username: dto.username,
       password: hashedPassword,
     });
@@ -210,7 +210,7 @@ export class ProfesseursService {
         nomComplet: `${dto.prenom} ${dto.nom}`,
         username: dto.username,
         motDePasse: motDePasseClair,
-        role: LIBELLE_TYPE[dto.typePersonne ?? 2] ?? 'Personnel',
+        role: LIBELLE_TYPE[dto.typePersonne ?? 1] ?? 'Personnel',
       });
     }
 
@@ -220,11 +220,11 @@ export class ProfesseursService {
   }
 
   /**
-   * Lister toutes les personnes de type Professeur (typePersonne = 2)
+   * Lister toutes les personnes de type Professeur (typePersonne = 1)
    */
   async findAllPersonnes(): Promise<Personne[]> {
     return this.personneRepository.find({
-      where: { typePersonne: 2,
+      where: { typePersonne: 1,
           isDelete: 0
     },
       order: { nom: 'ASC' },
@@ -623,7 +623,7 @@ export class ProfesseursService {
   async search(query: string): Promise<Personne[]> {
     return this.personneRepository
       .createQueryBuilder('personne')
-      .where('personne.typePersonne = :type', { type: 2 })
+      .where('personne.typePersonne = :type', { type: 1 })
       .andWhere('personne.nom LIKE :q OR personne.prenom LIKE :q', {
         q: `%${query}%`,
       })

@@ -781,7 +781,7 @@ function StaffPage() {
                       setAdmins(await getAdmins());
                     } else {
                       const personne = await createPersonne(data);
-                      if (Number(data.typePersonne) === 1 && data.idCours) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours, idAdmin });
+                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours ? data.idCours : undefined, idAdmin });
                       setModalOuvert(false); setForm(STAFF_VIDE);
                       await charger();
                     }
@@ -801,7 +801,7 @@ function StaffPage() {
                       setAdmins(await getAdmins());
                     } else {
                       const personne = await createPersonne(data);
-                      if (Number(data.typePersonne) === 1 && data.idCours) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours, idAdmin });
+                      if (Number(data.typePersonne) === 1) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours ? data.idCours : undefined, idAdmin });
                       setModalOuvert(false); setForm(STAFF_VIDE);
                       await charger();
                     }

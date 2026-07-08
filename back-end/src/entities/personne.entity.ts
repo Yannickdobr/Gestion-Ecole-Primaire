@@ -16,10 +16,11 @@ import { Admin } from './admin.entity';
  * ✅ CORRECTION WARN : @Exclude() sur password pour ne jamais l'exposer en API
  *
  * typePersonne :
- *   1 = Administrateur
- *   2 = Professeur / Enseignant
- *   3 = Élève
+ *   1 = Enseignant
+ *   2 = Administratif (secrétariat)
+ *   3 = Scolarité (inscriptions)
  *   4 = Parent / Tuteur
+ *   5 = Autres
  */
 @Entity('personne')
 export class Personne {

@@ -8,6 +8,7 @@ import {
   MaxLength,
   IsDateString,
   MinLength,
+  IsBoolean,
 } from 'class-validator';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,6 +65,10 @@ export class CreatePersonneEnseignantDto {
   @IsOptional()
   @IsInt()
   idAdmin?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  forceNew?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
