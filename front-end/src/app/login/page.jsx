@@ -2,10 +2,11 @@
 import { Eye, EyeClosed } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login as apiLogin, forgotPassword } from "@/lib/api";
+import { login as apiLogin, forgotPassword, getLoginStats } from "@/lib/api";
 import { homePathFor } from "@/lib/roles";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { useEffect } from "react";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -14,6 +15,44 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth(); // 2. Grab the login function
+
+  // Fetch public stats for the UI
+  const [stats, setStats] = useState({ nbEleves: 0, nbCoursAujourdhui: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  useEffect(() => {
+    getLoginStats()
+      .then(setStats)
+      .catch((e) => { console.error("Erreur stats:", e); })
+      .finally(() => setStatsLoading(false));
+  }, []);
+
+  // Génération de la semaine courante
+  const generateCurrentWeek = () => {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 (Dimanche) à 6 (Samedi)
+    // On veut commencer par Lundi (si Dimanche, on recule de 6 jours)
+    const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - distanceToMonday);
+
+    const labels = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+    const week = [];
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      week.push({
+        label: labels[i],
+        dayNumber: date.getDate(),
+        isToday: date.toDateString() === today.toDateString()
+      });
+    }
+    return week;
+  };
+
+  const currentWeek = generateCurrentWeek();
 
   // Mot de passe oublié
   const [fpOpen, setFpOpen] = useState(false);
@@ -520,7 +559,7 @@ export default function LoginPage() {
             }}
           />
 
-          {/* Floating card: Today's schedule */}
+          {/* Floating card: Today's stats */}
           <div
             style={{
               position: "absolute",
@@ -529,7 +568,7 @@ export default function LoginPage() {
               right: 24,
               background: "rgba(255,255,255,0.96)",
               borderRadius: 16,
-              padding: "14px 18px",
+              padding: "16px 18px",
               boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
               backdropFilter: "blur(8px)",
             }}
@@ -539,11 +578,11 @@ export default function LoginPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: 4,
+                marginBottom: 8,
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1208" }}>
-                Cours du matin
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1208" }}>
+                BrightSchool Aujourd'hui
               </span>
               <div
                 style={{
@@ -554,23 +593,21 @@ export default function LoginPage() {
                 }}
               />
             </div>
-            <span style={{ fontSize: 12, color: "#8a7060" }}>
-              Mathématiques — Salle 104
-            </span>
-            <div
-              style={{
-                marginTop: 8,
-                padding: "5px 10px",
-                background: "rgba(216,99,16,0.1)",
-                borderRadius: 6,
-                fontSize: 11,
-                color: "#d86310",
-                fontWeight: 600,
-                display: "inline-block",
-              }}
-            >
-              08h00 – 10h00
-            </div>
+            
+            {statsLoading ? (
+              <span style={{ fontSize: 13, color: "#8a7060" }}>Chargement des statistiques...</span>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#8a7060" }}>Cours prévus ce jour :</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#d86310" }}>{stats.nbCoursAujourdhui}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: "#8a7060" }}>Élèves inscrits :</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1208" }}>{stats.nbEleves}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Week strip */}
@@ -585,9 +622,9 @@ export default function LoginPage() {
               justifyContent: "space-between",
             }}
           >
-            {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d, i) => (
+            {currentWeek.map((d, i) => (
               <div
-                key={d}
+                key={i}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -598,94 +635,38 @@ export default function LoginPage() {
                 <span
                   style={{
                     fontSize: 10,
-                    color: "rgba(255,255,255,0.6)",
-                    fontWeight: 500,
+                    fontWeight: 600,
+                    color: d.isToday ? "#d86310" : "rgba(255,255,255,0.7)",
+                    textTransform: "uppercase",
                   }}
                 >
-                  {d}
+                  {d.label}
                 </span>
-                <span
+                <div
                   style={{
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: i === 3 ? "#d86310" : "white",
-                    background:
-                      i === 3 ? "rgba(255,255,255,0.15)" : "transparent",
-                    width: 32,
-                    height: 32,
+                    width: 40,
+                    height: 40,
                     borderRadius: "50%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    backdropFilter: i === 3 ? "blur(4px)" : "none",
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: d.isToday ? "#fff" : "white",
+                    background: d.isToday
+                      ? "linear-gradient(135deg, #d86310 0%, #ac3b02 100%)"
+                      : "transparent",
+                    border: d.isToday
+                      ? "none"
+                      : "1px solid rgba(255,255,255,0.15)",
                   }}
                 >
-                  {19 + i}
-                </span>
+                  {d.dayNumber}
+                </div>
               </div>
             ))}
           </div>
 
-          {/* Floating card: Réunion */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 32,
-              left: 24,
-              right: 24,
-              background: "rgba(255,255,255,0.96)",
-              borderRadius: 16,
-              padding: "14px 18px",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 4,
-              }}
-            >
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1208" }}>
-                Réunion Parents-Profs
-              </span>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#22c55e",
-                }}
-              />
-            </div>
-            <span style={{ fontSize: 12, color: "#8a7060" }}>
-              12h00 – 13h30
-            </span>
-            <div style={{ display: "flex", marginTop: 10, gap: -4 }}>
-              {["#f0d5c0", "#d86310", "#7a3b1e", "#4a3728"].map((c, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: "50%",
-                    background: c,
-                    border: "2px solid white",
-                    marginLeft: i === 0 ? 0 : -8,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 10,
-                    color: "white",
-                    fontWeight: 600,
-                  }}
-                >
-                  {["A", "B", "C", "+"][i]}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

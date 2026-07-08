@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -160,6 +161,7 @@ export class EvaluationsService {
     const session = this.sessionRepository.create({
       libelle: dto.libelle,
       description: dto.description,
+      date_passage: dto.date_passage ? new Date(dto.date_passage) : null,
       trimestre,
       responsable,
     });
@@ -199,6 +201,7 @@ export class EvaluationsService {
     const s = await this.findSessionById(idSession);
     if (dto.libelle !== undefined) s.libelle = dto.libelle;
     if (dto.description !== undefined) s.description = dto.description;
+    if (dto.date_passage !== undefined) s.date_passage = dto.date_passage ? new Date(dto.date_passage) : null;
     if (dto.idTrimestre !== undefined) {
       s.trimestre = await this.findTrimestreById(dto.idTrimestre);
     }
@@ -345,6 +348,19 @@ export class EvaluationsService {
     if (!cours) throw new NotFoundException(`Cours introuvable (id: ${dto.idCours})`);
 
     const session = await this.findSessionById(dto.idSession);
+    
+    // Vérification de la date de passage
+    if (session.date_passage) {
+      const today = new Date();
+      // On compare la fin de la journée
+      today.setHours(0, 0, 0, 0);
+      const limitDate = new Date(session.date_passage);
+      limitDate.setHours(0, 0, 0, 0);
+      
+      if (today > limitDate) {
+        throw new ForbiddenException("Le délai de passage pour cette session est expiré, vous ne pouvez plus saisir d'évaluations.");
+      }
+    }
 
     // Vérifier doublon
     const exists = await this.evaluationRepository.findOne({
@@ -424,8 +440,20 @@ export class EvaluationsService {
   async updateNote(idEval: number, dto: UpdateEvaluationDto): Promise<Evaluation> {
     const eval_ = await this.evaluationRepository.findOne({ where: { idEval,
         isDelete: 0
-    } });
+    }, relations: ['session'] });
     if (!eval_) throw new NotFoundException(`Évaluation introuvable (id: ${idEval})`);
+    
+    // Vérification de la date de passage pour la modification
+    if (eval_.session && eval_.session.date_passage) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const limitDate = new Date(eval_.session.date_passage);
+      limitDate.setHours(0, 0, 0, 0);
+      if (today > limitDate) {
+        throw new ForbiddenException("Le délai de passage pour cette session est expiré, vous ne pouvez plus modifier d'évaluations.");
+      }
+    }
+
     if (dto.note !== undefined) eval_.note = dto.note;
     if (dto.appreciation !== undefined) eval_.appreciation = dto.appreciation;
     return this.evaluationRepository.save(eval_);

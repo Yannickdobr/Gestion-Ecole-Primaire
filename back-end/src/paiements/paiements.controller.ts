@@ -11,14 +11,14 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FondateurGuard } from '../auth/fondateur.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role, DIRECTION } from '../auth/roles.enum';
+import { Role, DIRECTION, PERSONNEL } from '../auth/roles.enum';
 import { AccessControlService } from '../common/access-control.service';
 
 @ApiTags('Paiements')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 // Par défaut, la gestion financière est réservée à la direction et à la scolarité (comptable).
-@Roles(...DIRECTION, Role.SCOLARITE)
+@Roles(...DIRECTION, ...PERSONNEL)
 @Controller('paiements')
 export class PaiementsController {
   constructor(
@@ -115,7 +115,7 @@ export class PaiementsController {
   }
 
   @Get('eleve/:matricule')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT) // un parent voit les paiements de SES enfants
+  @Roles(...DIRECTION, ...PERSONNEL, Role.PARENT) // un parent voit les paiements de SES enfants
   @ApiOperation({ summary: 'Historique des paiements d\'un élève' })
   async findPaiementsByEleve(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
     await this.acl.assertEleveAccess(req.user, matricule);
@@ -141,7 +141,7 @@ export class PaiementsController {
 
   // ── Arriérés ──────────────────────────────────────────────────────────
   @Get('arrieres/:matricule/annee/:idAca')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Calculer les arriérés d\'un élève (sans scolarité)' })
   async calculerArrieres(
     @Request() req,
@@ -153,7 +153,7 @@ export class PaiementsController {
   }
 
   @Get('arrieres/:matricule/annee/:idAca/cycle/:idCycle')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Calculer les arriérés avec scolarité du cycle' })
   async calculerArrieresAvecScolarite(
     @Request() req,

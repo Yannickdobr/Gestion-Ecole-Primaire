@@ -30,11 +30,19 @@ export async function apiFetch(path, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    // NestJS renvoie message en string ou en tableau (erreurs de validation)
+    // NestJS ConflictException avec un objet : { message: { requireRestoreChoice, restoreId, ... }, statusCode: 409 }
+    const payload = typeof data.message === 'object' && data.message !== null && !Array.isArray(data.message) ? data.message : data;
     const msg = Array.isArray(data.message)
       ? data.message.join(", ")
-      : data.message || `Erreur ${res.status}`;
-    const err = new Error(msg); err.status = res.status; err.requireConfirmation = data.requireConfirmation; err.impact = data.impact; throw err;
+      : (typeof data.message === 'string' ? data.message : payload.message) || `Erreur ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.requireConfirmation = payload.requireConfirmation || data.requireConfirmation;
+    err.impact = payload.impact || data.impact;
+    err.requireRestoreChoice = payload.requireRestoreChoice || data.requireRestoreChoice;
+    err.restoreId = payload.restoreId || data.restoreId;
+    err.ancienNom = payload.ancienNom || data.ancienNom;
+    throw err;
   }
 
   return data;
@@ -96,6 +104,8 @@ export function login(username, password) {
     body: JSON.stringify({ username, password }),
   });
 }
+
+export const getLoginStats = () => apiFetch("/public/login-stats", { cache: 'no-store' });
 
 // ─── Ressources (lecture) ────────────────────────────────────────────────
 // Chaque fonction correspond à un endpoint GET du backend NestJS.

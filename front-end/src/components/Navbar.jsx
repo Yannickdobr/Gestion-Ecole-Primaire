@@ -17,7 +17,7 @@ const translations = {
     mission: "Notre Mission",
     why: "Pourquoi nous",
     programs: "Programmes",
-    portal: "Portail Élève",
+    portal: "Se Connecter",
   },
 };
 

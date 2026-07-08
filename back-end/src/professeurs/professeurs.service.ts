@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Enseignant } from '../entities/enseignant.entity';
 import { Titulaire } from '../entities/titulaire.entity';
@@ -111,11 +111,50 @@ export class ProfesseursService {
     dto: CreatePersonneEnseignantDto,
     user?: { id: number; role: string },
   ): Promise<Personne> {
-    // Vérifier que le username n'existe pas déjà
+    // ── Restauration d'un ancien compte ──────────────────────────────────────
+    if ((dto as any).restoreId) {
+      const ancien = await this.personneRepository.findOne({
+        where: { idPers: (dto as any).restoreId, isDelete: 1 },
+        relations: ['admin'],
+      });
+      if (!ancien) throw new NotFoundException('Ancien compte introuvable pour la restauration');
+
+      // Restaurer le compte : remettre isDelete à 0 et retirer le suffixe _DELETED_
+      ancien.isDelete = 0;
+      ancien.username = dto.username; // on remet l'email propre
+      ancien.nom = dto.nom;
+      ancien.prenom = dto.prenom;
+      if (dto.dateNaissance) ancien.dateNaissance = new Date(dto.dateNaissance);
+      if (dto.lieuNaissance) ancien.lieuNaissance = dto.lieuNaissance;
+      if (dto.mobile) ancien.mobile = dto.mobile;
+      if (dto.phone) ancien.phone = dto.phone;
+      if (dto.typePersonne !== undefined) ancien.typePersonne = dto.typePersonne;
+
+      // Nouveau mot de passe
+      const motDePasseClair = dto.password ? dto.password : genererMotDePasse();
+      ancien.password = await bcrypt.hash(motDePasseClair, 10);
+
+      const admin = await this.resoudreAdmin(dto.idAdmin, user);
+      if (admin) ancien.admin = admin;
+
+      const saved = await this.personneRepository.save(ancien);
+
+      // Envoyer les nouveaux identifiants par email
+      const emailEnvoye = await this.mailService.envoyerIdentifiants({
+        to: dto.username,
+        nomComplet: `${dto.prenom} ${dto.nom}`,
+        username: dto.username,
+        motDePasse: motDePasseClair,
+        role: LIBELLE_TYPE[dto.typePersonne ?? 2] ?? 'Personnel',
+      });
+      (saved as any).emailEnvoye = emailEnvoye;
+      (saved as any).restored = true;
+      return saved;
+    }
+
+    // ── Vérifier que le username n'existe pas déjà (actif) ───────────────────
     const exists = await this.personneRepository.findOne({
-      where: { username: dto.username,
-          isDelete: 0
-    },
+      where: { username: dto.username, isDelete: 0 },
     });
     if (exists) {
       throw new ConflictException(
@@ -123,6 +162,22 @@ export class ProfesseursService {
       );
     }
 
+    // ── Vérifier s'il existe un ancien compte supprimé avec ce même email ────
+    if (!(dto as any).forceNew) {
+      const ancienSupprime = await this.personneRepository.findOne({
+        where: { username: Like(`${dto.username}_DELETED_%`), isDelete: 1 },
+      });
+      if (ancienSupprime) {
+        throw new ConflictException({
+          message: `Un ancien compte avec l'email "${dto.username}" existe déjà mais a été supprimé. Voulez-vous le restaurer ?`,
+          requireRestoreChoice: true,
+          restoreId: ancienSupprime.idPers,
+          ancienNom: `${ancienSupprime.prenom} ${ancienSupprime.nom}`,
+        });
+      }
+    }
+
+    // ── Création normale ─────────────────────────────────────────────────────
     // Mot de passe : fourni, sinon généré par le backend (envoyé ensuite par email)
     const motDePasseGenere = !dto.password;
     const motDePasseClair = dto.password ? dto.password : genererMotDePasse();
@@ -210,6 +265,8 @@ export class ProfesseursService {
       // pour les entités dépendantes listées. 
       // Il ne reste qu'à supprimer la personne elle-même.
       personne.isDelete = 1;
+      // Libérer le username (email) en ajoutant un suffixe _DELETED_<timestamp>
+      personne.username = `${personne.username}_DELETED_${Date.now()}`;
       await m.save(personne);
     });
 

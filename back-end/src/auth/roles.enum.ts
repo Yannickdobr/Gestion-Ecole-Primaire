@@ -20,6 +20,9 @@ export enum Role {
 /** La direction : accès de gestion complet. */
 export const DIRECTION: Role[] = [Role.ROOT, Role.FONDATEUR, Role.DIRECTEUR];
 
+/** Personnel de gestion (Secrétariat & Scolarité) : partagent les mêmes droits administratifs */
+export const PERSONNEL: Role[] = [Role.ADMINISTRATIF, Role.SCOLARITE];
+
 /** Déduit le rôle métier à partir du payload JWT (req.user). */
 export function roleFromUser(
   user: { role?: string; typeRole?: number } | undefined,

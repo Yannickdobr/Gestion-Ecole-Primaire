@@ -8,7 +8,7 @@ import { CreateEleveDto, UpdateEleveDto, AddParentDto } from './dto/eleve.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role, DIRECTION } from '../auth/roles.enum';
+import { Role, DIRECTION, PERSONNEL } from '../auth/roles.enum';
 import { AccessControlService } from '../common/access-control.service';
 
 @ApiTags('Élèves')
@@ -22,24 +22,24 @@ export class ElevesController {
   ) {}
 
   @Get()
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister tous les élèves' })
   @ApiResponse({ status: 200, description: 'Liste complète des élèves' })
   findAll() { return this.elevesService.findAll(); }
 
   @Get('actifs')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister les élèves actifs uniquement' })
   findActifs() { return this.elevesService.findActifs(); }
 
   @Get('search')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.AUTRES)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.AUTRES)
   @ApiOperation({ summary: 'Rechercher un élève par nom ou prénom' })
   @ApiQuery({ name: 'q', required: true, description: 'Nom ou prénom à rechercher' })
   search(@Query('q') query: string) { return this.elevesService.search(query ?? ''); }
 
   @Get('parent/:idPers')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.PARENT)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Lister les enfants d\'un parent' })
   @ApiParam({ name: 'idPers', description: 'Identifiant (idPers) du parent' })
   findByParent(@Request() req, @Param('idPers', ParseIntPipe) idPers: number) {
@@ -49,7 +49,7 @@ export class ElevesController {
   }
 
   @Get(':matricule')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
   @ApiOperation({ summary: 'Détail d\'un élève' })
   @ApiParam({ name: 'matricule', description: 'Matricule de l\'élève' })
   @ApiResponse({ status: 404, description: 'Élève introuvable' })
@@ -59,37 +59,37 @@ export class ElevesController {
   }
 
   @Post()
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Inscrire un nouvel élève' })
   @ApiResponse({ status: 201, description: 'Élève créé avec succès' })
   create(@Body() dto: CreateEleveDto) { return this.elevesService.create(dto); }
 
   @Put(':matricule')
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @ApiOperation({ summary: 'Modifier un élève' })
   update(@Param('matricule', ParseIntPipe) matricule: number, @Body() dto: UpdateEleveDto) {
     return this.elevesService.update(matricule, dto);
   }
 
   @Patch(':matricule/desactiver')
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @ApiOperation({ summary: 'Désactiver un élève (soft delete)' })
   desactiver(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.desactiver(matricule); }
 
   @Patch(':matricule/activer')
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @ApiOperation({ summary: 'Réactiver un élève' })
   activer(@Param('matricule', ParseIntPipe) matricule: number) { return this.elevesService.activer(matricule); }
 
   @Delete(':matricule')
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer définitivement un élève' })
   remove(@Param('matricule', ParseIntPipe) matricule: number, @Query('force') force?: string) { return this.elevesService.remove(matricule, force === 'true'); }
 
   @Get(':matricule/parents')
-  @Roles(...DIRECTION, Role.SCOLARITE, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.PARENT, Role.AUTRES)
   @ApiOperation({ summary: 'Lister les parents d\'un élève' })
   async getParents(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
     await this.acl.assertEleveAccess(req.user, matricule);
@@ -97,7 +97,7 @@ export class ElevesController {
   }
 
   @Post(':matricule/parents')
-  @Roles(...DIRECTION, Role.SCOLARITE)
+  @Roles(...DIRECTION, ...PERSONNEL)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Ajouter un parent à un élève' })
   addParent(@Param('matricule', ParseIntPipe) matricule: number, @Body() dto: AddParentDto) {

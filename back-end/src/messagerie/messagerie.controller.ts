@@ -7,7 +7,7 @@ import { CreateMessageDto, UpdateMessageDto, EnvoiMasseDto, ConvocationClasseDto
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role, DIRECTION } from '../auth/roles.enum';
+import { Role, DIRECTION, PERSONNEL } from '../auth/roles.enum';
 
 @ApiTags('Messagerie')
 @ApiBearerAuth('JWT-auth')
@@ -69,7 +69,7 @@ export class MessagerieController {
   envoyerEnMasse(@Request() req, @Body() dto: EnvoiMasseDto) { return this.messagerieService.envoyerEnMasse(dto, req.user); }
 
   @Post('convocation-classe/:idSalle')
-  @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE)
+  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Convoquer tous les parents des élèves d\'une classe (réunion parent-titulaire)' })
   convoquerParentsClasse(

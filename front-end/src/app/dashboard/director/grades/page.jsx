@@ -63,7 +63,7 @@ export default function GradesPage() {
   // Formulaires référentiels
   const [fAnnee, setFAnnee] = useState({ libelle: "", periode: "" });
   const [fTrim, setFTrim] = useState({ libelle: "", periode: "", idAca: "" });
-  const [fSess, setFSess] = useState({ libelle: "", idTrimestre: "", idPers: "" });
+  const [fSess, setFSess] = useState({ libelle: "", idTrimestre: "", idPers: "", date_passage: "" });
   const [fNat, setFNat] = useState({ libelle: "" });
   const [fEpr, setFEpr] = useState({ libelle: "", idNature: "", idPers: "", urlDoc: "" });
 
@@ -101,7 +101,7 @@ export default function GradesPage() {
       const { type, data } = editModal;
       if (type === 'annee') await updateAnnee(data.idAnnee, { libelle: data.libelle, periode: data.periode });
       else if (type === 'trim') await updateTrimestre(data.idTrimes, { libelle: data.libelle, periode: data.periode, idAca: Number(data.idAca) });
-      else if (type === 'sess') await updateSession(data.idSession, { libelle: data.libelle, idTrimestre: Number(data.idTrimestre), idPers: Number(data.idPers) });
+      else if (type === 'sess') await updateSession(data.idSession, { libelle: data.libelle, idTrimestre: Number(data.idTrimestre), idPers: Number(data.idPers), date_passage: data.date_passage || undefined });
       else if (type === 'nat') await updateNature(data.idNature, { libelle: data.libelle });
       else if (type === 'epr') await updateEpreuve(data.idEpreuve, { libelle: data.libelle, idNature: Number(data.idNature), idPers: Number(data.idPers), urlDoc: data.urlDoc });
       setEditModal({ type: null, data: null });
@@ -145,7 +145,7 @@ export default function GradesPage() {
   const addTrim = (e) => { e.preventDefault(); if (!fTrim.libelle.trim() || !fTrim.idAca) { setError("Libellé et année requis."); return; }
     submit(() => createTrimestre({ libelle: fTrim.libelle.trim(), periode: fTrim.periode.trim() || "INDEFINI", idAca: Number(fTrim.idAca), idAdmin }), () => setFTrim({ libelle: "", periode: "", idAca: "" })); };
   const addSess = (e) => { e.preventDefault(); if (!fSess.libelle.trim() || !fSess.idTrimestre || !fSess.idPers) { setError("Libellé, trimestre et responsable requis."); return; }
-    submit(() => createSession({ libelle: fSess.libelle.trim(), idTrimestre: Number(fSess.idTrimestre), idPers: Number(fSess.idPers) }), () => setFSess({ libelle: "", idTrimestre: "", idPers: "" })); };
+    submit(() => createSession({ libelle: fSess.libelle.trim(), idTrimestre: Number(fSess.idTrimestre), idPers: Number(fSess.idPers), date_passage: fSess.date_passage || undefined }), () => setFSess({ libelle: "", idTrimestre: "", idPers: "", date_passage: "" })); };
   const addNat = (e) => { e.preventDefault(); if (!fNat.libelle.trim()) return;
     submit(() => createNature({ libelle: fNat.libelle.trim() }), () => setFNat({ libelle: "" })); };
   const addEpr = (e) => { e.preventDefault(); if (!fEpr.libelle.trim() || !fEpr.idNature || !fEpr.idPers) { setError("Libellé, nature et auteur requis."); return; }
@@ -277,6 +277,9 @@ export default function GradesPage() {
                       <option value="">— Choisir —</option>
                       {personnes.map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
                     </select>
+                  </Field>
+                  <Field label="Date de clôture (Optionnel)">
+                    <input type="date" style={inputStyle} value={editModal.data.date_passage ? editModal.data.date_passage.split('T')[0] : ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, date_passage: e.target.value } }))} />
                   </Field>
                 </>
               )}
@@ -419,6 +422,9 @@ export default function GradesPage() {
                   <option value="">— Choisir —</option>
                   {personnes.map((p) => <option key={p.idPers} value={p.idPers}>{p.prenom} {p.nom}</option>)}
                 </select>
+              </Field>
+              <Field label="Date de clôture (Optionnel)">
+                <input type="date" style={inputStyle} value={fSess.date_passage} onChange={(e) => setFSess((s) => ({ ...s, date_passage: e.target.value }))} />
               </Field>
               <Btn envoi={envoi} disabled={trimestres.length === 0 || personnes.length === 0} hint={trimestres.length === 0 ? "Crée d'abord un trimestre." : ""} />
             </form>

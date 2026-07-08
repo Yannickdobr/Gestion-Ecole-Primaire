@@ -70,6 +70,10 @@ export class CreateSessionDto {
   @IsInt()
   @IsNotEmpty({ message: "L'identifiant du responsable (personne) est obligatoire" })
   idPers: number;
+
+  @IsOptional()
+  @IsDateString()
+  date_passage?: string;
 }
 
 export class UpdateSessionDto {
@@ -85,6 +89,10 @@ export class UpdateSessionDto {
   @IsOptional()
   @IsInt()
   idTrimestre?: number;
+
+  @IsOptional()
+  @IsDateString()
+  date_passage?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

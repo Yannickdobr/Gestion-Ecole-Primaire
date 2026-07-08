@@ -92,6 +92,8 @@ import { Residents } from './entities/residents.entity';
       inject: [ConfigService],
     }),
 
+    TypeOrmModule.forFeature([Eleve, EmploiDuTemps]),
+
     AuthModule,
     ElevesModule,
     ProfesseursModule,

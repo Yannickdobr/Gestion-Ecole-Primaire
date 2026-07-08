@@ -79,7 +79,7 @@ const content = {
       {
         title: "Ressources",
         links: [
-          { label: "Portail Élève", to: "/contact" },
+          { label: "Se Connecter", to: "/contact" },
           { label: "Actualités", to: "/news" },
           { label: "Calendrier scolaire", to: "/contact" },
         ],

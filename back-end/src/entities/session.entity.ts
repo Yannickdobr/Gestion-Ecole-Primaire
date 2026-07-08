@@ -24,6 +24,9 @@ export class Session {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ type: 'date', nullable: true })
+  date_passage: Date | null;
+
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   created_at: Date;
 

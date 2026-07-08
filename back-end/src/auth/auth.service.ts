@@ -6,7 +6,7 @@ import {
     ConflictException,
   } from '@nestjs/common';
   import { InjectRepository } from '@nestjs/typeorm';
-  import { Repository } from 'typeorm';
+  import { Repository, Like } from 'typeorm';
   import { JwtService } from '@nestjs/jwt';
   import * as bcrypt from 'bcrypt';
   import { Admin } from '../entities/admin.entity';
@@ -297,6 +297,8 @@ import {
       }
       try {
         admin.isDelete = 1;
+        // Libérer le username (email) en ajoutant un suffixe _DELETED_<timestamp>
+        admin.username = `${admin.username}_DELETED_${Date.now()}`;
         await this.adminRepository.save(admin);
       } catch {
         throw new ConflictException("Suppression impossible : cet administrateur est lié à des données.");
@@ -322,11 +324,57 @@ import {
         throw new ForbiddenException("Vous n'êtes pas autorisé à créer ce type de compte.");
       }
 
-      const exists = await this.adminRepository.findOne({ where: { username: dto.username,
-          isDelete: 0
-    } });
+      // ── Restauration d'un ancien compte admin ─────────────────────────────
+      if ((dto as any).restoreId) {
+        const ancien = await this.adminRepository.findOne({
+          where: { ID: (dto as any).restoreId, isDelete: 1 },
+        });
+        if (!ancien) throw new NotFoundException('Ancien compte admin introuvable pour la restauration');
+
+        ancien.isDelete = 0;
+        ancien.username = dto.username;
+        ancien.nom = dto.nom;
+        ancien.typeAdmin = Number(dto.typeAdmin);
+        if (dto.mobile) ancien.mobile = dto.mobile;
+
+        const motDePasseClair = genererMotDePasse();
+        ancien.password = await bcrypt.hash(motDePasseClair, 10);
+        ancien.actif = 1;
+
+        const saved = await this.adminRepository.save(ancien);
+
+        const emailEnvoye = await this.mailService.envoyerIdentifiants({
+          to: dto.username,
+          nomComplet: dto.nom,
+          username: dto.username,
+          motDePasse: motDePasseClair,
+          role: LIBELLE_ADMIN[Number(dto.typeAdmin)] ?? 'Administrateur',
+        });
+        (saved as any).emailEnvoye = emailEnvoye;
+        (saved as any).restored = true;
+        return saved;
+      }
+
+      // ── Vérifier que le username n'existe pas déjà (actif) ────────────────
+      const exists = await this.adminRepository.findOne({ where: { username: dto.username, isDelete: 0 } });
       if (exists) throw new ConflictException(`L'identifiant "${dto.username}" est déjà utilisé`);
 
+      // ── Vérifier s'il existe un ancien compte supprimé avec ce même email ──
+      if (!(dto as any).forceNew) {
+        const ancienSupprime = await this.adminRepository.findOne({
+          where: { username: Like(`${dto.username}_DELETED_%`), isDelete: 1 },
+        });
+        if (ancienSupprime) {
+          throw new ConflictException({
+            message: `Un ancien compte admin avec l'email "${dto.username}" existe déjà mais a été supprimé. Voulez-vous le restaurer ?`,
+            requireRestoreChoice: true,
+            restoreId: ancienSupprime.ID,
+            ancienNom: ancienSupprime.nom,
+          });
+        }
+      }
+
+      // ── Création normale ──────────────────────────────────────────────────
       const motDePasseClair = genererMotDePasse();
       const hashedPassword = await bcrypt.hash(motDePasseClair, 10);
 

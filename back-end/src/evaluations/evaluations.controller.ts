@@ -11,14 +11,14 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role, DIRECTION } from '../auth/roles.enum';
+import { Role, DIRECTION, PERSONNEL } from '../auth/roles.enum';
 import { AccessControlService } from '../common/access-control.service';
 
 @ApiTags('Évaluations')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 // Défaut : personnel pédagogique (consultations). Les écritures sont restreintes ci-dessous.
-@Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE)
+@Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL)
 @Controller('evaluations')
 export class EvaluationsController {
   constructor(
@@ -146,7 +146,7 @@ export class EvaluationsController {
   saisirNote(@Body() dto: CreateEvaluationDto) { return this.evaluationsService.saisirNote(dto); }
 
   @Get('notes/eleve/:matricule')
-  @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE, Role.PARENT) // parent : ses enfants
+  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL, Role.PARENT) // parent : ses enfants
   @ApiOperation({ summary: 'Toutes les notes d\'un élève' })
   async findNotesByEleve(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
     await this.acl.assertEleveAccess(req.user, matricule);
@@ -166,7 +166,7 @@ export class EvaluationsController {
   classementSession(@Param('idSession', ParseIntPipe) idSession: number) { return this.evaluationsService.classementSession(idSession); }
 
   @Get('notes/moyenne/:matricule/session/:idSession')
-  @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE, Role.PARENT)
+  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Calculer la moyenne d\'un élève pour une session' })
   async calculerMoyenne(
     @Request() req,
@@ -198,7 +198,7 @@ export class EvaluationsController {
   }
 
   @Get('rapports/eleve/:matricule')
-  @Roles(...DIRECTION, Role.ENSEIGNANT, Role.SCOLARITE, Role.PARENT)
+  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Bulletins d\'un élève (tous trimestres)' })
   async findRapportsByEleve(@Request() req, @Param('matricule', ParseIntPipe) matricule: number) {
     await this.acl.assertEleveAccess(req.user, matricule);

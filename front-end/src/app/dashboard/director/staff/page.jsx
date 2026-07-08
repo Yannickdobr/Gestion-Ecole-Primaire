@@ -134,6 +134,9 @@ function StaffPage() {
   const [titForm, setTitForm] = useState({ idPers: "", idSalle: "" });
   const [titErreur, setTitErreur] = useState("");
 
+  // Modal de restauration d'un ancien compte supprimé
+  const [restoreModal, setRestoreModal] = useState({ isOpen: false, type: null, restoreId: null, ancienNom: "", message: "", pendingData: null });
+
   const charger = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -210,7 +213,11 @@ function StaffPage() {
         setError(`Compte admin créé, mais l'email n'a pas pu être envoyé à « ${username.trim()} ». Vérifiez l'adresse email.`);
       }
     } catch (e) {
-      setAdminErreur(e.message || "Échec de la création du compte admin.");
+      if (e.requireRestoreChoice) {
+        setRestoreModal({ isOpen: true, type: 'admin', restoreId: e.restoreId, ancienNom: e.ancienNom, message: e.message, pendingData: { nom: nom.trim(), username: username.trim(), typeAdmin: Number(typeAdmin), mobile: adminForm.mobile.trim() || undefined } });
+      } else {
+        setAdminErreur(e.message || "Échec de la création du compte admin.");
+      }
     } finally {
       setEnvoi(false);
     }
@@ -281,7 +288,11 @@ function StaffPage() {
         setError(`Compte créé, mais l'email d'identifiants n'a pas pu être envoyé à « ${username.trim()} ». Vérifiez l'adresse email.`);
       }
     } catch (e) {
-      setFormErreur(e.message || "Échec de la création du membre.");
+      if (e.requireRestoreChoice) {
+        setRestoreModal({ isOpen: true, type: 'personne', restoreId: e.restoreId, ancienNom: e.ancienNom, message: e.message, pendingData: { nom: nom.trim(), prenom: prenom.trim(), username: username.trim(), typePersonne: Number(typePersonne), mobile: form.mobile.trim() || undefined, idAdmin, idCours: form.idCours ? Number(form.idCours) : undefined } });
+      } else {
+        setFormErreur(e.message || "Échec de la création du membre.");
+      }
     } finally {
       setEnvoi(false);
     }
@@ -746,6 +757,63 @@ function StaffPage() {
         onClose={() => setDeleteModal({ isOpen: false, item: null, type: null, impact: [], message: "" })}
         onConfirm={executeDelete}
       />
+
+      {/* ─── Modal de restauration d'un ancien compte ─── */}
+      {restoreModal.isOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
+          <div style={{ background: "white", borderRadius: 16, padding: "32px 28px", maxWidth: 480, width: "90%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)" }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 18, fontWeight: 700, color: "var(--brown)" }}>🔄 Ancien compte détecté</h3>
+            <p style={{ fontSize: 14, color: "#555", lineHeight: 1.6, margin: "0 0 8px" }}>{restoreModal.message}</p>
+            <p style={{ fontSize: 13, color: "var(--orange)", fontWeight: 600, margin: "0 0 20px" }}>Ancien titulaire : {restoreModal.ancienNom}</p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setRestoreModal({ isOpen: false, type: null, restoreId: null, ancienNom: "", message: "", pendingData: null })}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "1.5px solid var(--surface-border)", background: "white", color: "#555", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >Annuler</button>
+              <button
+                onClick={async () => {
+                  setEnvoi(true);
+                  try {
+                    const data = { ...restoreModal.pendingData, forceNew: true };
+                    if (restoreModal.type === 'admin') {
+                      const cree = await createAdmin(data);
+                      setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
+                      setAdmins(await getAdmins());
+                    } else {
+                      const personne = await createPersonne(data);
+                      if (Number(data.typePersonne) === 1 && data.idCours) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours, idAdmin });
+                      setModalOuvert(false); setForm(STAFF_VIDE);
+                      await charger();
+                    }
+                  } catch (e) { setError(e.message || "Erreur lors de la création."); }
+                  finally { setEnvoi(false); setRestoreModal({ isOpen: false, type: null, restoreId: null, ancienNom: "", message: "", pendingData: null }); }
+                }}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "var(--surface-border)", color: "var(--brown)", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+              >Non, créer un nouveau</button>
+              <button
+                onClick={async () => {
+                  setEnvoi(true);
+                  try {
+                    const data = { ...restoreModal.pendingData, restoreId: restoreModal.restoreId };
+                    if (restoreModal.type === 'admin') {
+                      const cree = await createAdmin(data);
+                      setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
+                      setAdmins(await getAdmins());
+                    } else {
+                      const personne = await createPersonne(data);
+                      if (Number(data.typePersonne) === 1 && data.idCours) await createEnseignant({ idPers: personne.idPers, idCours: data.idCours, idAdmin });
+                      setModalOuvert(false); setForm(STAFF_VIDE);
+                      await charger();
+                    }
+                  } catch (e) { setError(e.message || "Erreur lors de la restauration."); }
+                  finally { setEnvoi(false); setRestoreModal({ isOpen: false, type: null, restoreId: null, ancienNom: "", message: "", pendingData: null }); }
+                }}
+                style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 12px rgba(216,99,16,0.25)" }}
+              >Oui, restaurer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
