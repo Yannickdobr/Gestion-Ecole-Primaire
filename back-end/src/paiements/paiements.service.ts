@@ -157,12 +157,19 @@ export class PaiementsService {
 
   async removeMode(idMode: number, force: boolean = false): Promise<{ message: string }> {
     const mode = await this.findModeById(idMode);
-    await verifierAvantSuppression(
-      this.modeRepository.manager,
-      `le mode "${mode.libelle}"`,
-      [{ entity: Paiement, where: { mode: { idMode } }, label: (n) => `${n} paiement(s)` }],
-      force
-    );
+
+    // L'historique des paiements doit être conservé : supprimer un mode ne doit
+    // JAMAIS supprimer les paiements enregistrés avec ce mode. On BLOQUE (même en
+    // mode force). Désactivez-le plutôt (actif=0) pour le retirer des choix futurs.
+    const nbPaie = await this.paiementRepository.count({
+      where: { mode: { idMode }, isDelete: 0 },
+    });
+    if (nbPaie > 0) {
+      throw new ConflictException(
+        `Impossible de supprimer le mode "${mode.libelle}" : ${nbPaie} paiement(s) l'utilisent. Désactivez-le plutôt pour conserver l'historique.`,
+      );
+    }
+
     mode.isDelete = 1;
     await this.modeRepository.save(mode);
     return { message: `Mode "${mode.libelle}" supprimé` };

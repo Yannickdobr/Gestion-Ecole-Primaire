@@ -299,12 +299,23 @@ import { Evaluation } from '../entities/evaluation.entity';
   
     async removeAnnee(idAnnee: number, force: boolean = false): Promise<{ message: string }> {
       const annee = await this.findAnneeById(idAnnee);
+
+      // L'historique des paiements doit être conservé : supprimer une année ne doit
+      // JAMAIS supprimer les paiements de cette année. On BLOQUE (même en mode force).
+      const nbPaie = await this.anneeRepository.manager.count(Paiement, {
+        where: { anneeAcademique: { idAnnee }, isDelete: 0 },
+      });
+      if (nbPaie > 0) {
+        throw new ConflictException(
+          `Impossible de supprimer l'année "${annee.libelle}" : ${nbPaie} paiement(s) y sont rattaché(s). L'historique financier doit être conservé.`,
+        );
+      }
+
       await verifierAvantSuppression(
         this.anneeRepository.manager,
         `l'année "${annee.libelle}"`,
         [
           { entity: Frequente, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} affectation(s)` },
-          { entity: Paiement, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} paiement(s)` },
           { entity: Rapport, where: { anneeAcademique: { idAnnee } }, label: (n) => `${n} bulletin(s)` },
           { 
             entity: Trimestre, 

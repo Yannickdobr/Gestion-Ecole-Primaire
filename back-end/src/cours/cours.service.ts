@@ -132,12 +132,24 @@ export class CoursService {
 
   async removeCours(idCours: number, force: boolean = false): Promise<{ message: string }> {
     const cours = await this.findCoursById(idCours);
+
+    // Cours = matière de difficulté d'enseignant(s) : on NE supprime JAMAIS l'enseignant.
+    // idCours est NOT NULL sur Enseignant -> on ne peut pas couper le lien : on BLOQUE
+    // (même en mode force), pour préserver le prof. Réaffecter la matière d'abord.
+    const nbEns = await this.coursRepository.manager.count(Enseignant, {
+      where: { cours: { idCours }, isDelete: 0 },
+    });
+    if (nbEns > 0) {
+      throw new ConflictException(
+        `Impossible de supprimer le cours "${cours.libelle}" : c'est la matière de difficulté de ${nbEns} enseignant(s). Réaffectez-la d'abord (Suivi RH).`,
+      );
+    }
+
     await verifierAvantSuppression(
       this.coursRepository.manager,
       `le cours "${cours.libelle}"`,
       [
         { entity: EmploiDuTemps, where: { cours: { idCours } }, label: (n) => `${n} créneau(x) d'emploi du temps` },
-        { entity: Enseignant, where: { cours: { idCours } }, label: (n) => `${n} enseignant(s)` },
         { entity: Evaluation, where: { cours: { idCours } }, label: (n) => `${n} note(s)` },
       ],
       force,
@@ -252,12 +264,20 @@ export class CoursService {
 
   async removeSpecialite(idSpecialite: number, force: boolean = false): Promise<{ message: string }> {
     const spe = await this.findSpecialiteById(idSpecialite);
-    await verifierAvantSuppression(
-      this.specialiteRepository.manager,
-      `la spécialité "${spe.libelle}"`,
-      [{ entity: Livres, where: { specialite: { idSpecialite } }, label: (n) => `${n} livre(s)` }],
-      force
-    );
+
+    // Un livre est un objet de catalogue : supprimer une spécialité ne doit JAMAIS
+    // supprimer ses livres. idSpecialite est NOT NULL -> on ne peut pas couper le lien,
+    // donc on BLOQUE (même en mode force). Réaffectez les livres à une autre
+    // spécialité d'abord (Bibliothèque).
+    const nbLivres = await this.livresRepository.count({
+      where: { specialite: { idSpecialite }, isDelete: 0 },
+    });
+    if (nbLivres > 0) {
+      throw new ConflictException(
+        `Impossible de supprimer la spécialité "${spe.libelle}" : ${nbLivres} livre(s) y sont rattaché(s). Réaffectez-les à une autre spécialité d'abord (Bibliothèque).`,
+      );
+    }
+
     spe.isDelete = 1;
     await this.specialiteRepository.save(spe);
     return { message: `Spécialité "${spe.libelle}" supprimée` };
@@ -355,6 +375,16 @@ export class CoursService {
 
   async removeLivre(idLivre: number, force: boolean = false): Promise<{ message: string }> {
     const livre = await this.findLivreById(idLivre);
+
+    // Un livre est partagé : sa suppression ne doit PAS entraîner celle des cours
+    // qui l'utilisent. On COUPE le lien (cours.idLivre = null, colonne nullable)
+    // pour qu'aucun cours n'affiche un livre « supprimé ».
+    await this.coursRepository.manager.update(
+      Cours,
+      { livre: { idLivre }, isDelete: 0 },
+      { livre: null },
+    );
+
     livre.isDelete = 1; // suppression logique (cohérent avec le reste)
     await this.livresRepository.save(livre);
     return { message: `Livre "${livre.titre}" supprimé` };
