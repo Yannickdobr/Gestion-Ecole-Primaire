@@ -291,10 +291,8 @@ export default function StudentsPage() {
       setParentForm(PARENT_VIDE);
       const data = await getParentsEleve(parentsEleve.matricule);
       setParentsListe(Array.isArray(data) ? data : []);
-      // Alerte si l'email d'identifiants n'a pas pu partir
-      if (personne?.emailEnvoye === false) {
-        setParentErreur(`Parent créé et rattaché, mais l'email n'a pas pu être envoyé à « ${username.trim()} ». Vérifiez l'adresse email.`);
-      }
+      // L'email d'identifiants est garanti envoyé : en cas d'échec, le backend
+      // aurait levé une erreur (503) et ni le parent ni le rattachement n'existeraient.
     } catch (e) {
       setParentErreur(e.message || "Échec de la création du parent.");
     } finally {

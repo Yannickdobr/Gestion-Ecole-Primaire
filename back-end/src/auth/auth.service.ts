@@ -4,6 +4,7 @@ import {
     NotFoundException,
     ForbiddenException,
     ConflictException,
+    ServiceUnavailableException,
   } from '@nestjs/common';
   import { InjectRepository } from '@nestjs/typeorm';
   import { Repository, Like } from 'typeorm';
@@ -341,8 +342,8 @@ import {
         ancien.password = await bcrypt.hash(motDePasseClair, 10);
         ancien.actif = 1;
 
-        const saved = await this.adminRepository.save(ancien);
-
+        // Identifiants envoyés AVANT d'enregistrer la restauration : si l'envoi
+        // échoue, le compte reste supprimé (aucune modification persistée).
         const emailEnvoye = await this.mailService.envoyerIdentifiants({
           to: dto.username,
           nomComplet: dto.nom,
@@ -350,6 +351,13 @@ import {
           motDePasse: motDePasseClair,
           role: LIBELLE_ADMIN[Number(dto.typeAdmin)] ?? 'Administrateur',
         });
+        if (!emailEnvoye) {
+          throw new ServiceUnavailableException(
+            `Compte non restauré : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+          );
+        }
+
+        const saved = await this.adminRepository.save(ancien);
         (saved as any).emailEnvoye = emailEnvoye;
         (saved as any).restored = true;
         return saved;
@@ -387,8 +395,9 @@ import {
         mobile: dto.mobile ?? '000', // NOT NULL en BD
         alanyaID: '000', // NOT NULL en BD
       });
-      const saved = await this.adminRepository.save(admin);
 
+      // Le mot de passe admin est toujours généré : l'email est le seul moyen d'accès.
+      // On l'envoie AVANT d'enregistrer ; si l'envoi échoue, aucun compte n'est créé.
       const emailEnvoye = await this.mailService.envoyerIdentifiants({
         to: dto.username,
         nomComplet: dto.nom,
@@ -396,6 +405,13 @@ import {
         motDePasse: motDePasseClair,
         role: LIBELLE_ADMIN[Number(dto.typeAdmin)] ?? 'Administrateur',
       });
+      if (!emailEnvoye) {
+        throw new ServiceUnavailableException(
+          `Compte non créé : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+        );
+      }
+
+      const saved = await this.adminRepository.save(admin);
       (saved as any).emailEnvoye = emailEnvoye;
       return saved;
     }

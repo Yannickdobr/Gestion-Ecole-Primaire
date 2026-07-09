@@ -205,7 +205,7 @@ function StaffPage() {
     }
     setEnvoi(true);
     try {
-      const cree = await createAdmin({
+      await createAdmin({
         nom: nom.trim(),
         username: username.trim(),
         typeAdmin: Number(typeAdmin),
@@ -214,9 +214,8 @@ function StaffPage() {
       setAdminModal(false);
       setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
       setAdmins(await getAdmins());
-      if (cree?.emailEnvoye === false) {
-        setError(`Compte admin créé, mais l'email n'a pas pu être envoyé à « ${username.trim()} ». Vérifiez l'adresse email.`);
-      }
+      // L'email d'identifiants est garanti envoyé : si l'envoi avait échoué,
+      // le backend aurait levé une erreur (503) et le compte n'aurait pas été créé.
     } catch (e) {
       if (e.requireRestoreChoice) {
         setRestoreModal({ isOpen: true, type: 'admin', restoreId: e.restoreId, ancienNom: e.ancienNom, message: e.message, pendingData: { nom: nom.trim(), username: username.trim(), typeAdmin: Number(typeAdmin), mobile: adminForm.mobile.trim() || undefined } });
@@ -288,10 +287,8 @@ function StaffPage() {
       setModalOuvert(false);
       setForm(STAFF_VIDE);
       await charger();
-      // Alerte si l'email d'identifiants n'a pas pu partir
-      if (personne?.emailEnvoye === false) {
-        setError(`Compte créé, mais l'email d'identifiants n'a pas pu être envoyé à « ${username.trim()} ». Vérifiez l'adresse email.`);
-      }
+      // L'email d'identifiants est garanti envoyé : si l'envoi avait échoué,
+      // le backend aurait levé une erreur (503) et le compte n'aurait pas été créé.
     } catch (e) {
       if (e.requireRestoreChoice) {
         setRestoreModal({ isOpen: true, type: 'personne', restoreId: e.restoreId, ancienNom: e.ancienNom, message: e.message, pendingData: { nom: nom.trim(), prenom: prenom.trim(), username: username.trim(), typePersonne: Number(typePersonne), mobile: form.mobile.trim() || undefined, idAdmin, idCours: form.idCours ? Number(form.idCours) : undefined } });
@@ -809,7 +806,7 @@ function StaffPage() {
                   try {
                     const data = { ...restoreModal.pendingData, forceNew: true };
                     if (restoreModal.type === 'admin') {
-                      const cree = await createAdmin(data);
+                      await createAdmin(data);
                       setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
                       setAdmins(await getAdmins());
                     } else {
@@ -830,7 +827,7 @@ function StaffPage() {
                   try {
                     const data = { ...restoreModal.pendingData, restoreId: restoreModal.restoreId };
                     if (restoreModal.type === 'admin') {
-                      const cree = await createAdmin(data);
+                      await createAdmin(data);
                       setAdminModal(false); setAdminForm({ nom: "", username: "", typeAdmin: "", mobile: "" });
                       setAdmins(await getAdmins());
                     } else {

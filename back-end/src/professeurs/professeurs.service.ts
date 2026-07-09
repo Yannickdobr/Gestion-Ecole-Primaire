@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
@@ -137,9 +138,8 @@ export class ProfesseursService {
       const admin = await this.resoudreAdmin(dto.idAdmin, user);
       if (admin) ancien.admin = admin;
 
-      const saved = await this.personneRepository.save(ancien);
-
-      // Envoyer les nouveaux identifiants par email
+      // On envoie les nouveaux identifiants AVANT d'enregistrer la restauration :
+      // si l'envoi échoue, le compte reste supprimé (aucune modification persistée).
       const emailEnvoye = await this.mailService.envoyerIdentifiants({
         to: dto.username,
         nomComplet: `${dto.prenom} ${dto.nom}`,
@@ -147,6 +147,13 @@ export class ProfesseursService {
         motDePasse: motDePasseClair,
         role: LIBELLE_TYPE[dto.typePersonne ?? 1] ?? 'Personnel',
       });
+      if (!emailEnvoye) {
+        throw new ServiceUnavailableException(
+          `Compte non restauré : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+        );
+      }
+
+      const saved = await this.personneRepository.save(ancien);
       (saved as any).emailEnvoye = emailEnvoye;
       (saved as any).restored = true;
       return saved;
@@ -200,9 +207,10 @@ export class ProfesseursService {
     const admin = await this.resoudreAdmin(dto.idAdmin, user);
     if (admin) personne.admin = admin;
 
-    const saved = await this.personneRepository.save(personne);
-
-    // Si le mot de passe a été généré, on envoie les identifiants par email
+    // Si le mot de passe est GÉNÉRÉ, l'utilisateur ne peut accéder au compte que par
+    // l'email d'identifiants : on l'envoie AVANT d'enregistrer. Si l'envoi échoue,
+    // on n'enregistre RIEN (pas de compte fantôme sans identifiants).
+    // (Si le créateur a saisi lui-même le mot de passe, aucun email n'est requis.)
     let emailEnvoye: boolean | null = null;
     if (motDePasseGenere) {
       emailEnvoye = await this.mailService.envoyerIdentifiants({
@@ -212,9 +220,16 @@ export class ProfesseursService {
         motDePasse: motDePasseClair,
         role: LIBELLE_TYPE[dto.typePersonne ?? 1] ?? 'Personnel',
       });
+      if (!emailEnvoye) {
+        throw new ServiceUnavailableException(
+          `Compte non créé : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+        );
+      }
     }
 
-    // On expose le statut d'envoi pour que le frontend puisse alerter si échec
+    const saved = await this.personneRepository.save(personne);
+
+    // On expose le statut d'envoi pour que le frontend puisse informer
     (saved as any).emailEnvoye = emailEnvoye;
     return saved;
   }
