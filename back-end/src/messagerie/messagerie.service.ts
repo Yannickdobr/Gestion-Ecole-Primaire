@@ -169,7 +169,7 @@ export class MessagerieService {
     if (!expediteur) throw new NotFoundException('Aucune personne en base pour signer la convocation.');
 
     // Élèves de la salle -> leurs parents (dédupliqués).
-    const freqs = await manager.find(Frequente, { where: { salle: { idSalle } }, relations: ['eleve'] });
+    const freqs = await manager.find(Frequente, { where: { salle: { idSalle }, isDelete: 0 }, relations: ['eleve'] });
     const matricules = [...new Set(freqs.map((f) => f.eleve?.matricule).filter(Boolean))];
     if (matricules.length === 0) return { envoyes: 0, parents: 0 };
 

@@ -151,9 +151,9 @@ export class CoursService {
   async searchCours(query: string): Promise<Cours[]> {
     return this.coursRepository
       .createQueryBuilder('cours')
-      .leftJoinAndSelect('cours.classe', 'classe')
-      .leftJoinAndSelect('classe.cycle', 'cycle')
+      .leftJoinAndSelect('cours.livre', 'livre')
       .where('cours.libelle LIKE :q', { q: `%${query}%` })
+      .andWhere('cours.isDelete = 0')
       .orderBy('cours.libelle', 'ASC')
       .getMany();
   }
@@ -164,7 +164,7 @@ export class CoursService {
 
   async createDiscipline(dto: CreateDisciplineDto): Promise<Discipline> {
     const exists = await this.disciplineRepository.findOne({
-      where: { libelle: dto.libelle },
+      where: { libelle: dto.libelle, isDelete: 0 },
     });
     if (exists) throw new ConflictException(`La discipline "${dto.libelle}" existe déjà`);
 
@@ -176,11 +176,11 @@ export class CoursService {
   }
 
   async findAllDisciplines(): Promise<Discipline[]> {
-    return this.disciplineRepository.find({ order: { libelle: 'ASC' } });
+    return this.disciplineRepository.find({ where: { isDelete: 0 }, order: { libelle: 'ASC' } });
   }
 
   async findDisciplineById(ID: number): Promise<Discipline> {
-    const discipline = await this.disciplineRepository.findOne({ where: { ID } });
+    const discipline = await this.disciplineRepository.findOne({ where: { ID, isDelete: 0 } });
     if (!discipline) throw new NotFoundException(`Discipline introuvable (id: ${ID})`);
     return discipline;
   }
@@ -205,7 +205,7 @@ export class CoursService {
 
   async createSpecialite(dto: CreateSpecialiteDto): Promise<Specialite> {
     const exists = await this.specialiteRepository.findOne({
-      where: { libelle: dto.libelle },
+      where: { libelle: dto.libelle, isDelete: 0 },
     });
     if (exists) throw new ConflictException(`La spécialité "${dto.libelle}" existe déjà`);
 
@@ -231,12 +231,12 @@ export class CoursService {
   }
 
   async findAllSpecialites(): Promise<Specialite[]> {
-    return this.specialiteRepository.find({ order: { libelle: 'ASC' } });
+    return this.specialiteRepository.find({ where: { isDelete: 0 }, order: { libelle: 'ASC' } });
   }
 
   async findSpecialiteById(idSpecialite: number): Promise<Specialite> {
     const spe = await this.specialiteRepository.findOne({
-      where: { idSpecialite },
+      where: { idSpecialite, isDelete: 0 },
       relations: ['livres'],
     });
     if (!spe) throw new NotFoundException(`Spécialité introuvable (id: ${idSpecialite})`);
@@ -308,6 +308,7 @@ export class CoursService {
 
   async findAllLivres(): Promise<Livres[]> {
     return this.livresRepository.find({
+      where: { isDelete: 0 },
       relations: ['specialite'],
       order: { titre: 'ASC' },
     });
@@ -315,7 +316,7 @@ export class CoursService {
 
   async findLivresBySpecialite(idSpecialite: number): Promise<Livres[]> {
     return this.livresRepository.find({
-      where: { specialite: { idSpecialite } },
+      where: { specialite: { idSpecialite }, isDelete: 0 },
       relations: ['specialite'],
       order: { titre: 'ASC' },
     });
@@ -323,7 +324,7 @@ export class CoursService {
 
   async findLivreById(idLivre: number): Promise<Livres> {
     const livre = await this.livresRepository.findOne({
-      where: { idLivre },
+      where: { idLivre, isDelete: 0 },
       relations: ['specialite'],
     });
     if (!livre) throw new NotFoundException(`Livre introuvable (id: ${idLivre})`);
@@ -354,7 +355,8 @@ export class CoursService {
 
   async removeLivre(idLivre: number, force: boolean = false): Promise<{ message: string }> {
     const livre = await this.findLivreById(idLivre);
-    await this.livresRepository.remove(livre);
+    livre.isDelete = 1; // suppression logique (cohérent avec le reste)
+    await this.livresRepository.save(livre);
     return { message: `Livre "${livre.titre}" supprimé` };
   }
 
@@ -362,7 +364,8 @@ export class CoursService {
     return this.livresRepository
       .createQueryBuilder('livre')
       .leftJoinAndSelect('livre.specialite', 'specialite')
-      .where('livre.titre LIKE :q OR livre.auteurs LIKE :q', { q: `%${query}%` })
+      .where('(livre.titre LIKE :q OR livre.auteurs LIKE :q)', { q: `%${query}%` })
+      .andWhere('livre.isDelete = 0')
       .orderBy('livre.titre', 'ASC')
       .getMany();
   }

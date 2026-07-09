@@ -232,7 +232,8 @@ export class ElevesService {
       return this.eleveRepository
         .createQueryBuilder('eleve')
         .leftJoinAndSelect('eleve.villeNaissance', 'ville')
-        .where('eleve.nom LIKE :q OR eleve.prenom LIKE :q', { q: `%${query}%` })
+        .where('(eleve.nom LIKE :q OR eleve.prenom LIKE :q)', { q: `%${query}%` })
+        .andWhere('eleve.isDelete = 0')
         .orderBy('eleve.nom', 'ASC')
         .getMany();
     }

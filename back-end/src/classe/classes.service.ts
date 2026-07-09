@@ -76,12 +76,12 @@ import { Evaluation } from '../entities/evaluation.entity';
     }
   
     async findAllCycles(): Promise<Cycle[]> {
-      return this.cycleRepository.find({ order: { libelle: 'ASC' } });
+      return this.cycleRepository.find({ where: { isDelete: 0 }, order: { libelle: 'ASC' } });
     }
   
     async findCycleById(idCycle: number): Promise<Cycle> {
       const cycle = await this.cycleRepository.findOne({
-        where: { idCycle },
+        where: { idCycle, isDelete: 0 },
         relations: ['classes'],
       });
       if (!cycle) throw new NotFoundException(`Cycle introuvable (id: ${idCycle})`);
@@ -120,7 +120,7 @@ import { Evaluation } from '../entities/evaluation.entity';
       if (!cycle) throw new NotFoundException(`Cycle introuvable (id: ${dto.idCycle})`);
   
       const exists = await this.classeRepository.findOne({
-        where: { libelle: dto.libelle, cycle: { idCycle: dto.idCycle } },
+        where: { libelle: dto.libelle, cycle: { idCycle: dto.idCycle }, isDelete: 0 },
       });
       if (exists) throw new ConflictException(`La classe "${dto.libelle}" existe déjà dans ce cycle`);
   
@@ -134,6 +134,7 @@ import { Evaluation } from '../entities/evaluation.entity';
   
     async findAllClasses(): Promise<Classe[]> {
       return this.classeRepository.find({
+        where: { isDelete: 0 },
         // 'salles' est nécessaire côté front (bilan par classe, bulletins, délibération)
         relations: ['cycle', 'salles'],
         order: { libelle: 'ASC' },
@@ -143,7 +144,7 @@ import { Evaluation } from '../entities/evaluation.entity';
     async findClassesByCycle(idCycle: number): Promise<Classe[]> {
       await this.findCycleById(idCycle);
       return this.classeRepository.find({
-        where: { cycle: { idCycle } },
+        where: { cycle: { idCycle }, isDelete: 0 },
         relations: ['cycle'],
         order: { libelle: 'ASC' },
       });
@@ -215,6 +216,7 @@ import { Evaluation } from '../entities/evaluation.entity';
   
     async findAllSalles(): Promise<Salle[]> {
       return this.salleRepository.find({
+        where: { isDelete: 0 },
         relations: ['classe', 'classe.cycle'],
         order: { libelle: 'ASC' },
       });
@@ -400,7 +402,7 @@ import { Evaluation } from '../entities/evaluation.entity';
 
     async findFrequenterByEleve(matricule: number): Promise<Frequente[]> {
       return this.frequenteRepository.find({
-        where: { eleve: { matricule } },
+        where: { eleve: { matricule }, isDelete: 0 },
         relations: ['salle', 'salle.classe', 'anneeAcademique'],
         order: { created_at: 'DESC' },
       });
@@ -408,7 +410,7 @@ import { Evaluation } from '../entities/evaluation.entity';
   
     async findFrequenterBySalle(idSalle: number): Promise<Frequente[]> {
       return this.frequenteRepository.find({
-        where: { salle: { idSalle } },
+        where: { salle: { idSalle }, isDelete: 0 },
         relations: ['eleve', 'anneeAcademique'],
         order: { created_at: 'DESC' },
       });
