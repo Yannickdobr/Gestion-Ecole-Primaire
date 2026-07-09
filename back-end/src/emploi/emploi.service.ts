@@ -203,9 +203,10 @@ export class EmploiService {
       res.enseignantEffectif = titulaire || null;
       res.coursEffectif = c.cours;
       res.estInterim = false;
+      res.aCouvrir = false; // matière de difficulté du titulaire sans intérimaire libre
 
       // Chercher si ce créneau est modifié par le plan d'intérim
-      const swap = planGlobal.find(p => p.jour === c.jour && p.heure === c.heure && !p.conflit && 
+      const swap = planGlobal.find(p => p.jour === c.jour && p.heure === c.heure && !p.conflit &&
         (p.classeConcernee.idClasse === idClasse || p.classeInterimaire?.idClasse === idClasse)
       );
 
@@ -220,6 +221,16 @@ export class EmploiService {
           res.coursEffectif = swap.matiereContrepartie; // objet { idCours, libelle }
           res.estInterim = true;
         }
+      } else {
+        // Cas CONFLIT : ce créneau programme la matière de difficulté du titulaire
+        // mais aucun intérimaire n'est libre. On le signale (comme dans la vue
+        // enseignant : « à couvrir — aucun intérimaire libre ») au lieu de
+        // l'afficher comme un cours normal assuré par le titulaire.
+        const conflit = planGlobal.find(p =>
+          p.jour === c.jour && p.heure === c.heure && p.conflit &&
+          p.classeConcernee.idClasse === idClasse,
+        );
+        if (conflit) res.aCouvrir = true;
       }
       return res;
     });

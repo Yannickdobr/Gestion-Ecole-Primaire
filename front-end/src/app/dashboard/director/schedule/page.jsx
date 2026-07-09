@@ -88,6 +88,7 @@ const adaptEmploi = (rows = []) =>
     idSalle: null,
     status: 'normal',
     estInterim: e.estInterim || false,
+    aCouvrir: e.aCouvrir || false,
     enseignantEffectif: e.enseignantEffectif,
     coursEffectif: e.coursEffectif,
   }));
@@ -225,6 +226,7 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
   const isAnnule = slot.status === 'annule';
   const isExamen = slot.status === 'examen';
   const isInterim = slot.estInterim;
+  const isACouvrir = slot.aCouvrir; // matière de difficulté du titulaire, aucun intérimaire libre
 
   return (
     <div
@@ -232,11 +234,11 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         position: 'relative',
-        background: isInterim ? 'rgba(79,103,255,0.12)' : isAnnule
+        background: isACouvrir ? 'rgba(138,112,96,0.08)' : isInterim ? 'rgba(79,103,255,0.12)' : isAnnule
           ? 'repeating-linear-gradient(135deg,rgba(138,112,96,0.05),rgba(138,112,96,0.05) 4px,transparent 4px,transparent 8px)'
           : meta.bg,
-        border: `1.5px ${isConflict ? 'dashed' : 'solid'} ${isInterim ? 'rgba(79,103,255,0.35)' : meta.border}`,
-        borderLeft: `4px solid ${isConflict ? '#ef4444' : isInterim ? '#4f67ff' : subjectColor}`,
+        border: `1.5px ${isConflict || isACouvrir ? 'dashed' : 'solid'} ${isACouvrir ? 'rgba(138,112,96,0.5)' : isInterim ? 'rgba(79,103,255,0.35)' : meta.border}`,
+        borderLeft: `4px solid ${isConflict ? '#ef4444' : isACouvrir ? '#8a7060' : isInterim ? '#4f67ff' : subjectColor}`,
         borderRadius: 10,
         padding: '8px 10px',
         cursor: 'pointer',
@@ -273,15 +275,19 @@ function CourseBlock({ slot, viewMode, t, lookups, onDelete }) {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ flex: 1 }}>
           <div style={{
-            fontSize: 13, fontWeight: 700, color: isInterim ? '#3a4bd6' : isAnnule ? '#8a7060' : '#1a1208',
+            fontSize: 13, fontWeight: 700, color: isACouvrir ? '#8a7060' : isInterim ? '#3a4bd6' : isAnnule ? '#8a7060' : '#1a1208',
             lineHeight: 1.2, marginBottom: 4, fontFamily: "'Playfair Display',serif",
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             textDecoration: isAnnule ? 'line-through' : 'none',
           }}>
-            {isInterim ? (cours?.libelle || t.no_subject) : (cours?.libelle || t.no_subject)}
+            {cours?.libelle || t.no_subject}
           </div>
-          
-          {isInterim ? (
+
+          {isACouvrir ? (
+            <div style={{ fontSize: 10.5, color: '#8a7060', marginTop: 3 }}>
+              à couvrir — aucun intérimaire libre
+            </div>
+          ) : isInterim ? (
             <div style={{ fontSize: 10.5, color: "#4f67ff", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
               <Repeat size={11} /> intérim {viewMode !== 'class' && classe ? `· classe ${classe.libelle}` : ''}
             </div>
