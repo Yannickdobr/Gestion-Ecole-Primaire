@@ -31,7 +31,7 @@ export class Enseignant {
   // Titulaire.
 
   // Matière de DIFFICULTÉ (le cours qu'il NE donne PAS) — optionnel
-  @ManyToOne(() => Cours, { eager: true, nullable: true })
+  @ManyToOne(() => Cours, { eager: true, nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'idCours' })
   cours: Cours;
 
