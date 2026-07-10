@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useActiveYear } from "@/context/ActiveYearContext";
-import { getSessions, getClassementSession, getNotesEleve, getTitulaires, getFrequenteBySalle } from "@/lib/api";
-import { imprimerBulletin } from "@/lib/print";
+import { getSessions, getClassementSession, getNotesEleve, getTitulaires, getFrequenteBySalle, getTrimestres, getBulletinTrimestriel } from "@/lib/api";
+import { imprimerBulletin, imprimerBulletinTrimestriel } from "@/lib/print";
 import { Award, Printer } from "lucide-react";
 
 const thStyle = { padding: "12px 18px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -20,6 +20,8 @@ export default function TeacherBulletinsPage() {
   const [titulaire, setTitulaire] = useState(null);
   const [matricules, setMatricules] = useState(new Set());
   const [sessions, setSessions] = useState([]);
+  const [trimestres, setTrimestres] = useState([]);
+  const [idTrimes, setIdTrimes] = useState("");
   const [idSession, setIdSession] = useState("");
   const [classement, setClassement] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -29,11 +31,12 @@ export default function TeacherBulletinsPage() {
     let actif = true;
     (async () => {
       try {
-        const [tits, sess] = await Promise.all([getTitulaires(), getSessions().catch(() => [])]);
+        const [tits, sess, trims] = await Promise.all([getTitulaires(), getSessions().catch(() => []), getTrimestres().catch(() => [])]);
         const mien = (Array.isArray(tits) ? tits : []).find((t) => Number(t.personne?.idPers) === Number(user?.id));
         if (!actif) return;
         setTitulaire(mien || null);
         setSessions(Array.isArray(sess) ? sess : []);
+        setTrimestres(Array.isArray(trims) ? trims : []);
         if (mien?.salle?.idSalle) {
           const fr = await getFrequenteBySalle(mien.salle.idSalle).catch(() => []);
           if (!actif) return;
@@ -78,10 +81,23 @@ export default function TeacherBulletinsPage() {
 
   const classe = titulaire.salle?.classe?.libelle || "—";
 
-  // Sessions restreintes à l'année active
+  // Sessions et trimestres restreints à l'année active
   const sessionsAnnee = anneeId
     ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId))
     : sessions;
+  const trimestresAnnee = anneeId
+    ? trimestres.filter((t) => Number(t.anneeAcademique?.idAnnee) === Number(anneeId))
+    : trimestres;
+  const libTrimestre = trimestresAnnee.find((t) => String(t.idTrimes) === String(idTrimes))?.libelle || "";
+
+  const imprimerTrimestre = async (l) => {
+    try {
+      const b = await getBulletinTrimestriel(l.matricule, Number(idTrimes));
+      imprimerBulletinTrimestriel(b);
+    } catch (e) {
+      setError(e.message || "Impossible de générer le bulletin trimestriel.");
+    }
+  };
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "var(--font-body)" }}>
@@ -91,12 +107,21 @@ export default function TeacherBulletinsPage() {
       </div>
       <p style={{ color: "var(--muted)", marginBottom: 22 }}>Classe <b>{classe}</b> · classement et bulletins par session.</p>
 
-      <div style={{ maxWidth: 340, marginBottom: 20 }}>
-        <label style={labelStyle}>Session</label>
-        <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
-          <option value="">— Choisir une session —</option>
-          {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
-        </select>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 20 }}>
+        <div style={{ minWidth: 260 }}>
+          <label style={labelStyle}>Session</label>
+          <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
+            <option value="">— Choisir une session —</option>
+            {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+          </select>
+        </div>
+        <div style={{ minWidth: 260 }}>
+          <label style={labelStyle}>Trimestre (bulletin trimestriel)</label>
+          <select style={inputStyle} value={idTrimes} onChange={(e) => setIdTrimes(e.target.value)}>
+            <option value="">— Choisir un trimestre —</option>
+            {trimestresAnnee.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
+          </select>
+        </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
@@ -121,9 +146,16 @@ export default function TeacherBulletinsPage() {
                   <td style={{ ...tdStyle, fontWeight: 600 }}>{l.prenom} {l.nom} <span style={{ color: "var(--muted)", fontWeight: 400 }}>#{l.matricule}</span></td>
                   <td style={{ ...tdStyle, fontWeight: 700 }}>{fmt(l.moyenne)}/20</td>
                   <td style={{ ...tdStyle, textAlign: "right" }}>
-                    <button onClick={() => imprimer(l)} title="Imprimer le bulletin" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                      <Printer size={13} /> Bulletin
-                    </button>
+                    <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
+                      {idTrimes && (
+                        <button onClick={() => imprimerTrimestre(l)} title={`Bulletin trimestriel — ${libTrimestre}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Printer size={13} /> Trimestriel
+                        </button>
+                      )}
+                      <button onClick={() => imprimer(l)} title="Imprimer le bulletin de session" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                        <Printer size={13} /> Bulletin
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

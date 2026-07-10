@@ -14,10 +14,12 @@ import {
   createJustificatif,
   getJustificatifsByRapport,
   getAnnees,
+  getTrimestres,
+  getBulletinTrimestriel,
   uploadFichier,
   fichierURL
 } from "@/lib/api";
-import { imprimerRecu, imprimerBulletin } from "@/lib/print";
+import { imprimerRecu, imprimerBulletin, imprimerBulletinTrimestriel } from "@/lib/print";
 import ChangePassword from "@/components/ChangePassword";
 import { 
   LogOut, GraduationCap, BookOpen, Wallet, Mail, Printer, 
@@ -45,6 +47,8 @@ export default function ParentDashboard() {
   const [activeTab, setActiveTab] = useState("notes");
   const [annees, setAnnees] = useState<any[]>([]);
   const [activeYearId, setActiveYearId] = useState<number | null>(null);
+  const [trimestres, setTrimestres] = useState<any[]>([]);
+  const [selectedTrimes, setSelectedTrimes] = useState<number | "">("");
 
   const [arrieresData, setArrieresData] = useState<any>(null);
   const [frequence, setFrequence] = useState<any>(null);
@@ -58,17 +62,18 @@ export default function ParentDashboard() {
   const [justifFile, setJustifFile] = useState<File | null>(null);
   const [uploadingJustif, setUploadingJustif] = useState(false);
 
-  // Charger les années académiques au montage
+  // Charger les années académiques et les trimestres au montage
   useEffect(() => {
     (async () => {
       try {
-        const list = await getAnnees();
+        const [list, trims] = await Promise.all([getAnnees(), getTrimestres().catch(() => [])]);
         if (Array.isArray(list) && list.length > 0) {
           setAnnees(list);
           // Sélectionner l'année académique la plus récente
           const sorted = [...list].sort((a, b) => b.idAnnee - a.idAnnee);
           setActiveYearId(sorted[0].idAnnee);
         }
+        setTrimestres(Array.isArray(trims) ? trims : []);
       } catch (err) {
         console.error("Erreur lors de la récupération des années académiques", err);
       }
@@ -208,6 +213,21 @@ export default function ParentDashboard() {
   };
 
   const totalPaye = paiements.reduce((acc, p) => acc + (Number(p.montant) || 0), 0);
+
+  // Trimestres de l'année sélectionnée (pour le bulletin trimestriel)
+  const trimestresAnnee = activeYearId
+    ? trimestres.filter((t) => Number(t.anneeAcademique?.idAnnee) === Number(activeYearId))
+    : trimestres;
+
+  const telechargerBulletinTrimestriel = async () => {
+    if (!selection || !selectedTrimes) return;
+    try {
+      const b = await getBulletinTrimestriel(selection.matricule, Number(selectedTrimes));
+      imprimerBulletinTrimestriel(b);
+    } catch (e: any) {
+      alert(e.message || "Impossible de générer le bulletin trimestriel.");
+    }
+  };
 
   const renderTranchesList = () => {
     if (!arrieresData || !arrieresData.tranches || arrieresData.tranches.length === 0) {
@@ -439,20 +459,40 @@ export default function ParentDashboard() {
                             <BookOpen size={18} style={{ color: "var(--orange)" }} />
                             <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-dark)" }}>Notes de {selection.prenom}</h3>
                           </div>
-                          <button
-                            onClick={() => {
-                              const coefs = notes.reduce((s, n) => s + (Number(n.cours?.coefficient) || 1), 0);
-                              const moyenne = coefs
-                                ? notes.reduce((s, n) => s + (Number(n.note) || 0) * (Number(n.cours?.coefficient) || 1), 0) / coefs
-                                : null;
-                              imprimerBulletin({ eleve: selection, session: "Relevé de notes", notes, moyenne });
-                            }}
-                            disabled={notes.length === 0}
-                            title={notes.length === 0 ? "Aucune note à imprimer" : "Télécharger le bulletin"}
-                            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: notes.length === 0 ? "default" : "pointer", fontFamily: "inherit", opacity: notes.length === 0 ? 0.5 : 1 }}
-                          >
-                            <Printer size={15} /> Télécharger le bulletin
-                          </button>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <select
+                              value={selectedTrimes}
+                              onChange={(e) => setSelectedTrimes(e.target.value ? Number(e.target.value) : "")}
+                              style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", fontSize: 13, fontFamily: "inherit", color: "var(--text-dark)", cursor: "pointer" }}
+                            >
+                              <option value="">— Trimestre —</option>
+                              {trimestresAnnee.map((t) => (
+                                <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={telechargerBulletinTrimestriel}
+                              disabled={!selectedTrimes}
+                              title={!selectedTrimes ? "Choisissez un trimestre" : "Télécharger le bulletin trimestriel"}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", background: !selectedTrimes ? "rgba(216,99,16,0.4)" : "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 13, fontWeight: 600, cursor: !selectedTrimes ? "default" : "pointer", fontFamily: "inherit" }}
+                            >
+                              <Printer size={15} /> Bulletin trimestriel
+                            </button>
+                            <button
+                              onClick={() => {
+                                const coefs = notes.reduce((s, n) => s + (Number(n.cours?.coefficient) || 1), 0);
+                                const moyenne = coefs
+                                  ? notes.reduce((s, n) => s + (Number(n.note) || 0) * (Number(n.cours?.coefficient) || 1), 0) / coefs
+                                  : null;
+                                imprimerBulletin({ eleve: selection, session: "Relevé de notes", notes, moyenne });
+                              }}
+                              disabled={notes.length === 0}
+                              title={notes.length === 0 ? "Aucune note à imprimer" : "Télécharger le relevé"}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: notes.length === 0 ? "default" : "pointer", fontFamily: "inherit", opacity: notes.length === 0 ? 0.5 : 1 }}
+                            >
+                              <Printer size={15} /> Relevé
+                            </button>
+                          </div>
                         </div>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                           <thead>
