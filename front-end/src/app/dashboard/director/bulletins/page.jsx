@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import { getSessions, getClassementSession, getNotesEleve, getClasses, getFrequenteBySalle } from "@/lib/api";
 import { imprimerBulletin } from "@/lib/print";
 import { Award, ChevronDown, Trophy, Printer } from "lucide-react";
@@ -15,6 +16,7 @@ const fmt = (m) => (Math.round((Number(m) || 0) * 100) / 100).toLocaleString("fr
 const medaille = (r) => (r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" : `#${r}`);
 
 export default function BulletinsPage() {
+  const { anneeId } = useActiveYear();
   const [sessions, setSessions] = useState([]);
   const [idSession, setIdSession] = useState("");
   const [data, setData] = useState(null); // { effectif, classement }
@@ -57,7 +59,10 @@ export default function BulletinsPage() {
         let allMatricules = new Set();
         for (const s of classeObj.salles) {
           const freq = await getFrequenteBySalle(s.idSalle).catch(() => []);
-          freq.forEach(f => { if (f.eleve?.matricule) allMatricules.add(Number(f.eleve.matricule)); });
+          // Ne retenir que les affectations de l'année active
+          freq
+            .filter((f) => !anneeId || Number(f.anneeAcademique?.idAnnee) === Number(anneeId))
+            .forEach(f => { if (f.eleve?.matricule) allMatricules.add(Number(f.eleve.matricule)); });
         }
 
         const newClassement = data.classement.filter(l => allMatricules.has(Number(l.matricule)));
@@ -91,6 +96,11 @@ export default function BulletinsPage() {
     }
   };
 
+  // Sessions restreintes à l'année active
+  const sessionsAnnee = anneeId
+    ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId))
+    : sessions;
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "var(--font-body)" }}>
       <DashboardHeader />
@@ -105,7 +115,7 @@ export default function BulletinsPage() {
           <label style={labelStyle}>Session</label>
           <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
             <option value="">— Choisir une session —</option>
-            {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+            {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
           </select>
         </div>
         <div style={{ minWidth: 260 }}>

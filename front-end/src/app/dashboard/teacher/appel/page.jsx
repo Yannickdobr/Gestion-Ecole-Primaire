@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getTitulaires, getFrequenteBySalle, getAnnees, createRapport } from "@/lib/api";
+import { useActiveYear } from "@/context/ActiveYearContext";
+import { getTitulaires, getFrequenteBySalle, createRapport } from "@/lib/api";
 import { ClipboardCheck, Check, X, Clock, ShieldAlert, Plus } from "lucide-react";
 
 const inputStyle = { padding: "9px 12px", borderRadius: 9, border: "1.5px solid var(--surface-border)", fontSize: 13.5, fontFamily: "inherit", background: "#faf9f7", outline: "none" };
@@ -17,9 +18,10 @@ const ETATS = [
 
 export default function AppelPage() {
   const { user } = useAuth();
+  const { anneeId } = useActiveYear();
+  const idAca = anneeId; // année active globale (sélecteur du TopNav)
   const [titulaire, setTitulaire] = useState(null);
   const [eleves, setEleves] = useState([]);
-  const [idAca, setIdAca] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -37,15 +39,17 @@ export default function AppelPage() {
     let actif = true;
     (async () => {
       try {
-        const [tits, annees] = await Promise.all([getTitulaires(), getAnnees().catch(() => [])]);
+        const tits = await getTitulaires();
         const mien = (Array.isArray(tits) ? tits : []).find((t) => Number(t.personne?.idPers) === Number(user?.id));
         if (!actif) return;
         setTitulaire(mien || null);
-        const annee = (Array.isArray(annees) ? annees : []).reduce((a, c) => (!a || Number(c.idAnnee) > Number(a.idAnnee) ? c : a), null);
-        setIdAca(annee?.idAnnee ?? null);
         if (mien?.salle?.idSalle) {
           const fr = await getFrequenteBySalle(mien.salle.idSalle);
-          const liste = (Array.isArray(fr) ? fr : []).map((f) => f.eleve).filter(Boolean);
+          // Appel sur le roster de l'ANNÉE ACTIVE uniquement (via Frequente)
+          const liste = (Array.isArray(fr) ? fr : [])
+            .filter((f) => !anneeId || Number(f.anneeAcademique?.idAnnee) === Number(anneeId))
+            .map((f) => f.eleve)
+            .filter(Boolean);
           if (!actif) return;
           setEleves(liste);
           const init = {};
@@ -56,7 +60,7 @@ export default function AppelPage() {
       finally { if (actif) setLoading(false); }
     })();
     return () => { actif = false; };
-  }, [user?.id]);
+  }, [user?.id, anneeId]);
 
   const enregistrerAppel = async () => {
     setInfo("");

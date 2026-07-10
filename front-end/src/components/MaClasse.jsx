@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import {
-  getTitulaires, getFrequenteBySalle, getNotesEleve, getAnnees,
+  getTitulaires, getFrequenteBySalle, getNotesEleve,
   getRapportsEleve, createRapport, getJustificatifs,
 } from "@/lib/api";
 import { Users2, BookOpen, ChevronDown, ClipboardList, Plus, CheckCircle2 } from "lucide-react";
@@ -30,10 +31,11 @@ function moyenneDe(notes) {
 
 export default function MaClasse() {
   const { user } = useAuth();
+  const { anneeId } = useActiveYear();
+  const idAca = anneeId; // année active globale (sélecteur du TopNav)
   const [titulaire, setTitulaire] = useState(null);
   const [eleves, setEleves] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [idAca, setIdAca] = useState(null);
 
   const [notes, setNotes] = useState({});      // { matricule: [...] }
   const [moyennes, setMoyennes] = useState({}); // { matricule: number|null }
@@ -53,19 +55,20 @@ export default function MaClasse() {
     let actif = true;
     (async () => {
       try {
-        const [tits, annees] = await Promise.all([getTitulaires(), getAnnees().catch(() => [])]);
+        const tits = await getTitulaires();
         const mien = (Array.isArray(tits) ? tits : []).find(
           (t) => Number(t.personne?.idPers) === Number(user?.id),
         );
         if (!actif) return;
         setTitulaire(mien || null);
-        const annee = (Array.isArray(annees) ? annees : []).reduce(
-          (acc, a) => (!acc || Number(a.idAnnee) > Number(acc.idAnnee) ? a : acc), null);
-        setIdAca(annee?.idAnnee ?? null);
 
         if (mien?.salle?.idSalle) {
           const fr = await getFrequenteBySalle(mien.salle.idSalle);
-          const liste = (Array.isArray(fr) ? fr : []).map((f) => f.eleve).filter(Boolean);
+          // Roster de la classe pour l'ANNÉE ACTIVE uniquement (via Frequente)
+          const liste = (Array.isArray(fr) ? fr : [])
+            .filter((f) => !anneeId || Number(f.anneeAcademique?.idAnnee) === Number(anneeId))
+            .map((f) => f.eleve)
+            .filter(Boolean);
           if (!actif) return;
           setEleves(liste);
           // Précharge les notes de chaque élève → moyennes affichées dans le tableau
@@ -86,7 +89,7 @@ export default function MaClasse() {
       }
     })();
     return () => { actif = false; };
-  }, [user?.id]);
+  }, [user?.id, anneeId]);
 
   const basculer = (matricule, p) => {
     if (open === matricule && panel === p) { setOpen(null); return; }

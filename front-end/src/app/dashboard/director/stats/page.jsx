@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import { getSessions, getClassementSession, getStatsAbsences, getPaiementsAnnee, getAnnees } from "@/lib/api";
 import { BarChart3, Trophy, CalendarX, Wallet } from "lucide-react";
 
@@ -20,6 +21,7 @@ function Carte({ icon, titre, valeur, sous }) {
 }
 
 export default function StatsPage() {
+  const { anneeId } = useActiveYear();
   const [sessions, setSessions] = useState([]);
   const [annees, setAnnees] = useState([]);
   const [idSession, setIdSession] = useState("");
@@ -33,10 +35,13 @@ export default function StatsPage() {
     getAnnees().then((a) => {
       const arr = Array.isArray(a) ? a : [];
       setAnnees(arr);
-      const active = arr.reduce((x, c) => (!x || Number(c.idAnnee) > Number(x.idAnnee) ? c : x), null);
+      // Défaut : année active globale (TopNav) ; repli sur la plus récente
+      const active =
+        arr.find((c) => Number(c.idAnnee) === Number(anneeId)) ||
+        arr.reduce((x, c) => (!x || Number(c.idAnnee) > Number(x.idAnnee) ? c : x), null);
       if (active) setIdAca(String(active.idAnnee));
     }).catch(() => {});
-  }, []);
+  }, [anneeId]);
 
   useEffect(() => {
     if (!idSession) { setReussite(null); return; }
@@ -78,7 +83,9 @@ export default function StatsPage() {
           <label style={labelStyle}>Session (pour la réussite)</label>
           <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
             <option value="">— Choisir —</option>
-            {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+            {sessions
+              .filter((s) => !idAca || Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(idAca))
+              .map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
           </select>
         </div>
       </div>

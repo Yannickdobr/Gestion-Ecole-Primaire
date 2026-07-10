@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import { getSessions, getClassementSession, getNotesEleve, getTitulaires, getFrequenteBySalle } from "@/lib/api";
 import { imprimerBulletin } from "@/lib/print";
 import { Award, Printer } from "lucide-react";
@@ -15,6 +16,7 @@ const medaille = (r) => (r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" 
 
 export default function TeacherBulletinsPage() {
   const { user } = useAuth();
+  const { anneeId } = useActiveYear();
   const [titulaire, setTitulaire] = useState(null);
   const [matricules, setMatricules] = useState(new Set());
   const [sessions, setSessions] = useState([]);
@@ -35,12 +37,15 @@ export default function TeacherBulletinsPage() {
         if (mien?.salle?.idSalle) {
           const fr = await getFrequenteBySalle(mien.salle.idSalle).catch(() => []);
           if (!actif) return;
-          setMatricules(new Set((Array.isArray(fr) ? fr : []).map((f) => Number(f.eleve?.matricule)).filter(Boolean)));
+          // Roster de l'année active uniquement
+          setMatricules(new Set((Array.isArray(fr) ? fr : [])
+            .filter((f) => !anneeId || Number(f.anneeAcademique?.idAnnee) === Number(anneeId))
+            .map((f) => Number(f.eleve?.matricule)).filter(Boolean)));
         }
       } catch { if (actif) setTitulaire(null); }
     })();
     return () => { actif = false; };
-  }, [user?.id]);
+  }, [user?.id, anneeId]);
 
   useEffect(() => {
     if (!idSession || matricules.size === 0) { setClassement([]); return; }
@@ -73,6 +78,11 @@ export default function TeacherBulletinsPage() {
 
   const classe = titulaire.salle?.classe?.libelle || "—";
 
+  // Sessions restreintes à l'année active
+  const sessionsAnnee = anneeId
+    ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId))
+    : sessions;
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "var(--font-body)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 6 }}>
@@ -85,7 +95,7 @@ export default function TeacherBulletinsPage() {
         <label style={labelStyle}>Session</label>
         <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
           <option value="">— Choisir une session —</option>
-          {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+          {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
         </select>
       </div>
 

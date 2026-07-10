@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import { getSessions, getClasses, getClassementSession, getFrequenteBySalle, getAnnees, createRapport } from "@/lib/api";
 import { imprimerPV } from "@/lib/print";
 import { Gavel, Printer, Save } from "lucide-react";
@@ -16,6 +17,7 @@ const DECISIONS = ["Admis (passe en classe supérieure)", "Passage conditionnel"
 const decisionAuto = (moy) => (Number(moy) >= 10 ? DECISIONS[0] : DECISIONS[2]);
 
 export default function DeliberationPage() {
+  const { anneeId } = useActiveYear();
   const [sessions, setSessions] = useState([]);
   const [classes, setClasses] = useState([]);
   const [annees, setAnnees] = useState([]);
@@ -43,7 +45,9 @@ export default function DeliberationPage() {
         const mats = new Set();
         for (const s of classe?.salles || []) {
           const fr = await getFrequenteBySalle(s.idSalle).catch(() => []);
-          fr.forEach((f) => f.eleve?.matricule && mats.add(Number(f.eleve.matricule)));
+          fr
+            .filter((f) => !anneeId || Number(f.anneeAcademique?.idAnnee) === Number(anneeId))
+            .forEach((f) => f.eleve?.matricule && mats.add(Number(f.eleve.matricule)));
         }
         const d = await getClassementSession(idSession);
         const liste = (d?.classement || []).filter((l) => mats.has(Number(l.matricule)));
@@ -54,9 +58,16 @@ export default function DeliberationPage() {
       } catch (e) { setError(e.message || "Erreur de chargement."); setLignes([]); }
       finally { setLoading(false); }
     })();
-  }, [idSession, idClasse, classes]);
+  }, [idSession, idClasse, classes, anneeId]);
 
-  const anneeActive = annees.reduce((a, c) => (!a || Number(c.idAnnee) > Number(a.idAnnee) ? c : a), null);
+  // Année active globale (TopNav) ; repli sur la plus récente si non résolue
+  const anneeActive =
+    annees.find((a) => Number(a.idAnnee) === Number(anneeId)) ||
+    annees.reduce((a, c) => (!a || Number(c.idAnnee) > Number(a.idAnnee) ? c : a), null);
+  // Sessions restreintes à l'année active
+  const sessionsAnnee = anneeId
+    ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId))
+    : sessions;
   const libClasse = classes.find((c) => String(c.idClasse) === String(idClasse))?.libelle || "";
   const libSession = sessions.find((s) => String(s.idSession) === String(idSession))?.libelle || "";
   const admis = lignes.filter((l) => (decisions[l.matricule] || "").startsWith("Admis")).length;
@@ -103,7 +114,7 @@ export default function DeliberationPage() {
           <label style={labelStyle}>Session</label>
           <select style={inputStyle} value={idSession} onChange={(e) => setIdSession(e.target.value)}>
             <option value="">— Choisir —</option>
-            {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
+            {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}{s.trimestre ? ` · ${s.trimestre.libelle}` : ""}</option>)}
           </select>
         </div>
         <div style={{ minWidth: 240 }}>
