@@ -52,7 +52,13 @@ export default function LoginPage() {
     return week;
   };
 
-  const currentWeek = generateCurrentWeek();
+  // La page /login est prérendue statiquement : sans recalcul côté client, la
+  // bande de dates resterait figée à la date du build. On la recalcule donc au
+  // montage pour qu'elle reflète TOUJOURS la date réelle du visiteur.
+  const [currentWeek, setCurrentWeek] = useState(generateCurrentWeek);
+  useEffect(() => {
+    setCurrentWeek(generateCurrentWeek());
+  }, []);
 
   // Mot de passe oublié
   const [fpOpen, setFpOpen] = useState(false);
