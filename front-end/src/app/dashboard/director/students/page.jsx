@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import {
-  getEleves, createEleve, desactiverEleve, activerEleve, getVilles, seedVilles,
+  getEleves, getElevesByAnnee, createEleve, desactiverEleve, activerEleve, getVilles, seedVilles,
   getParentsEleve, createPersonne, addParentToEleve,
   getSalles, getAnnees, affecterEleve, getFrequenteByEleve, reaffecterEleve, deleteEleve,
 } from "@/lib/api";
@@ -52,6 +53,7 @@ function formatDate(d) {
 
 export default function StudentsPage() {
   const { user } = useAuth();
+  const { anneeId, annee } = useActiveYear();
   const [eleves, setEleves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -89,14 +91,15 @@ export default function StudentsPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await getEleves();
+      // Filtrage par année active : affectés cette année + non encore affectés.
+      const data = anneeId ? await getElevesByAnnee(anneeId) : await getEleves();
       setEleves(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e.message || "Erreur de chargement des élèves.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [anneeId]);
 
   const chargerVilles = useCallback(async () => {
     try {

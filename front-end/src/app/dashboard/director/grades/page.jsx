@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useAuth } from "@/context/AuthContext";
+import { useActiveYear } from "@/context/ActiveYearContext";
 import {
-  getEleves, getCours, getPersonnesTous, getNotesEleve, saisirNote,
+  getEleves, getElevesByAnnee, getCours, getPersonnesTous, getNotesEleve, saisirNote,
   getAnnees, getTrimestres, getSessions, getNatures, getEpreuves,
   createAnnee, createTrimestre, createSession, createNature, createEpreuve,
   updateAnnee, deleteAnnee, updateTrimestre, deleteTrimestre, updateSession, deleteSession,
@@ -34,6 +35,7 @@ const fmtMoy = (m) => (Math.round((Number(m) || 0) * 100) / 100).toLocaleString(
 
 export default function GradesPage() {
   const { user } = useAuth();
+  const { anneeId } = useActiveYear();
   const idAdmin = user?.role === "admin" && user?.id ? Number(user.id) : undefined;
   // « Saisi par » = le compte courant. Si c'est une personne (enseignant…),
   // on connaît son idPers ; si c'est un admin, le backend choisit un repli.
@@ -128,16 +130,30 @@ export default function GradesPage() {
     setError("");
     try {
       const [el, co, pe, an, tr, se, na, ep] = await Promise.all([
-        getEleves(), getCours(), getPersonnesTous(), getAnnees(),
+        // Élèves scopés à l'année active (affectés cette année + non affectés)
+        anneeId ? getElevesByAnnee(anneeId) : getEleves(),
+        getCours(), getPersonnesTous(), getAnnees(),
         getTrimestres(), getSessions(), getNatures(), getEpreuves(),
       ]);
       setEleves(el || []); setCours(co || []); setPersonnes(pe || []);
       setAnnees(an || []); setTrimestres(tr || []); setSessions(se || []);
       setNatures(na || []); setEpreuves(ep || []);
     } catch (e) { setError(e.message || "Erreur de chargement."); }
-  }, []);
+  }, [anneeId]);
 
   useEffect(() => { chargerTout(); }, [chargerTout]);
+
+  // Trimestres et sessions restreints à l'année active : garantit qu'une session
+  // se crée pour un trimestre de l'année concernée et qu'on ne saisit des notes
+  // que dans les sessions de cette année.
+  const trimestresAnnee = useMemo(
+    () => (anneeId ? trimestres.filter((t) => Number(t.anneeAcademique?.idAnnee) === Number(anneeId)) : trimestres),
+    [trimestres, anneeId],
+  );
+  const sessionsAnnee = useMemo(
+    () => (anneeId ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId)) : sessions),
+    [sessions, anneeId],
+  );
 
   const chargerNotes = async (mat) => {
     if (!mat) { setNotes([]); return; }
@@ -209,15 +225,20 @@ export default function GradesPage() {
 
   // ── Démarrage rapide : crée en une fois un jeu de référentiels minimal ──
   // (réutilise l'existant ; ne crée que les maillons manquants de la chaîne)
-  const refsIncomplets = sessions.length === 0 || epreuves.length === 0;
+  // Référentiels « incomplets » évalués pour l'année active (pas globalement)
+  const refsIncomplets = sessionsAnnee.length === 0 || epreuves.length === 0;
   const demarrageRapide = async () => {
     setSeeding(true); setError("");
     try {
       const respId = idPersCourant || personnes[0]?.idPers;
       if (!respId) throw new Error("Crée d'abord au moins un membre du personnel (il sera responsable de la session).");
-      const annee = annees[0] || await createAnnee({ libelle: anneeScolaireCourante(), periode: "INDEFINI", idAdmin });
-      const trim = trimestres[0] || await createTrimestre({ libelle: "1er Trimestre", periode: "INDEFINI", idAca: Number(annee.idAnnee), idAdmin });
-      if (sessions.length === 0) await createSession({ libelle: "Session 1", idTrimestre: Number(trim.idTrimes), idPers: Number(respId) });
+      // On amorce la chaîne pour l'ANNÉE ACTIVE (sinon la première année disponible).
+      const annee =
+        annees.find((a) => Number(a.idAnnee) === Number(anneeId)) ||
+        annees[0] ||
+        (await createAnnee({ libelle: anneeScolaireCourante(), periode: "INDEFINI", idAdmin }));
+      const trim = trimestresAnnee[0] || await createTrimestre({ libelle: "1er Trimestre", periode: "INDEFINI", idAca: Number(annee.idAnnee), idAdmin });
+      if (sessionsAnnee.length === 0) await createSession({ libelle: "Session 1", idTrimestre: Number(trim.idTrimes), idPers: Number(respId) });
       const nature = natures[0] || await createNature({ libelle: "Composition" });
       if (epreuves.length === 0) await createEpreuve({ libelle: "Composition", idNature: Number(nature.idNature), idPers: Number(respId) });
       await chargerTout();
@@ -283,7 +304,7 @@ export default function GradesPage() {
                   <Field label="Trimestre *">
                     <select style={inputStyle} value={editModal.data.idTrimestre || ""} onChange={(e) => setEditModal((s) => ({ ...s, data: { ...s.data, idTrimestre: e.target.value } }))} required>
                       <option value="">— Choisir —</option>
-                      {trimestres.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
+                      {trimestresAnnee.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
                     </select>
                   </Field>
                   <Field label="Responsable *">
@@ -431,7 +452,7 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Trimestre */}
-          <RefCard title="Trimestre" items={trimestres} getLabel={t => t.libelle} onEdit={t => setEditModal({ type: 'trim', data: t })} onDelete={t => handleDelete('trim', t.idTrimes)}>
+          <RefCard title="Trimestre" items={trimestresAnnee} getLabel={t => t.libelle} onEdit={t => setEditModal({ type: 'trim', data: t })} onDelete={t => handleDelete('trim', t.idTrimes)}>
             <form onSubmit={addTrim} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fTrim.libelle} onChange={(e) => setFTrim((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : 1er Trimestre" /></Field>
               <Field label="Année *">
@@ -445,13 +466,13 @@ export default function GradesPage() {
           </RefCard>
 
           {/* Session */}
-          <RefCard title="Session" items={sessions} getLabel={s => s.libelle} onEdit={s => setEditModal({ type: 'sess', data: s })} onDelete={s => handleDelete('sess', s.idSession)}>
+          <RefCard title="Session" items={sessionsAnnee} getLabel={s => s.libelle} onEdit={s => setEditModal({ type: 'sess', data: s })} onDelete={s => handleDelete('sess', s.idSession)}>
             <form onSubmit={addSess} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <Field label="Libellé *"><input style={inputStyle} value={fSess.libelle} onChange={(e) => setFSess((s) => ({ ...s, libelle: e.target.value }))} placeholder="ex : Session 1" /></Field>
               <Field label="Trimestre *">
                 <select style={inputStyle} value={fSess.idTrimestre} onChange={(e) => setFSess((s) => ({ ...s, idTrimestre: e.target.value }))}>
                   <option value="">— Choisir —</option>
-                  {trimestres.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
+                  {trimestresAnnee.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
                 </select>
               </Field>
               <Field label="Responsable *">
@@ -463,7 +484,7 @@ export default function GradesPage() {
               <Field label="Date de clôture (Optionnel)">
                 <input type="date" style={inputStyle} value={fSess.date_passage} onChange={(e) => setFSess((s) => ({ ...s, date_passage: e.target.value }))} />
               </Field>
-              <Btn envoi={envoi} disabled={trimestres.length === 0 || personnes.length === 0} hint={trimestres.length === 0 ? "Crée d'abord un trimestre." : ""} />
+              <Btn envoi={envoi} disabled={trimestresAnnee.length === 0 || personnes.length === 0} hint={trimestresAnnee.length === 0 ? "Crée d'abord un trimestre pour l'année active." : ""} />
             </form>
           </RefCard>
 
@@ -516,7 +537,7 @@ export default function GradesPage() {
               <Field label="Session *">
                 <select style={inputStyle} value={noteForm.idSession} onChange={(e) => setNoteForm((s) => ({ ...s, idSession: e.target.value }))}>
                   <option value="">— Choisir —</option>
-                  {sessions.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}</option>)}
+                  {sessionsAnnee.map((s) => <option key={s.idSession} value={s.idSession}>{s.libelle}</option>)}
                 </select>
               </Field>
               <Field label="Épreuve *">

@@ -102,6 +102,37 @@ export class ElevesService {
       });
     }
   
+    // ─── Lister les élèves rattachés à une année académique ───────────────────
+    // Règle retenue : élèves AFFECTÉS pour cette année (via Frequente) PLUS les
+    // élèves encore affectés à AUCUNE année (nouveaux inscrits à placer). La
+    // scolarité voit ainsi la promotion de l'année et les élèves en attente.
+    async findByAnnee(idAca: number): Promise<Eleve[]> {
+      const mgr = this.eleveRepository.manager;
+
+      // Matricules affectés pour l'année demandée
+      const freqAnnee = await mgr.find(Frequente, {
+        where: { anneeAcademique: { idAnnee: idAca }, isDelete: 0 },
+        relations: ['eleve'],
+      });
+      const affectesAnnee = new Set(
+        freqAnnee.map((f) => f.eleve?.matricule).filter((m) => m != null),
+      );
+
+      // Matricules affectés à une année quelconque (pour isoler les « jamais affectés »)
+      const freqTous = await mgr.find(Frequente, {
+        where: { isDelete: 0 },
+        relations: ['eleve'],
+      });
+      const dejaAffectes = new Set(
+        freqTous.map((f) => f.eleve?.matricule).filter((m) => m != null),
+      );
+
+      const tous = await this.findAll(); // déjà filtré isDelete + relations + tri
+      return tous.filter(
+        (e) => affectesAnnee.has(e.matricule) || !dejaAffectes.has(e.matricule),
+      );
+    }
+
     // ─── Lister les enfants d'un parent (par idPers du parent) ────────────────
     async findByParent(idPers: number): Promise<Eleve[]> {
       const liens = await this.parentsRepository.find({

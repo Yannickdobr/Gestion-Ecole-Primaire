@@ -112,6 +112,8 @@ export const getLoginStats = () => apiFetch("/public/login-stats", { cache: 'no-
 
 export const getEleves = () => apiFetch("/eleves");
 export const getElevesActifs = () => apiFetch("/eleves/actifs");
+// Élèves rattachés à une année (affectés cette année + non encore affectés)
+export const getElevesByAnnee = (idAca) => apiFetch(`/eleves/par-annee/${idAca}`);
 export const getEleve = (matricule) => apiFetch(`/eleves/${matricule}`);
 export const deleteEleve = (matricule, force = false) =>
   apiFetch(`/eleves/${matricule}${force ? '?force=true' : ''}`, { method: 'DELETE' });

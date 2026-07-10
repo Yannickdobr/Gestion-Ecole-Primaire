@@ -38,6 +38,14 @@ export class ElevesController {
   @ApiQuery({ name: 'q', required: true, description: 'Nom ou prénom à rechercher' })
   search(@Query('q') query: string) { return this.elevesService.search(query ?? ''); }
 
+  @Get('par-annee/:idAca')
+  @Roles(...DIRECTION, ...PERSONNEL, Role.ENSEIGNANT, Role.AUTRES)
+  @ApiOperation({ summary: 'Lister les élèves d\'une année (affectés cette année + non encore affectés)' })
+  @ApiParam({ name: 'idAca', description: 'Identifiant de l\'année académique' })
+  findByAnnee(@Param('idAca', ParseIntPipe) idAca: number) {
+    return this.elevesService.findByAnnee(idAca);
+  }
+
   @Get('parent/:idPers')
   @Roles(...DIRECTION, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Lister les enfants d\'un parent' })
