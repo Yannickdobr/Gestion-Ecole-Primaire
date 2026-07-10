@@ -371,6 +371,7 @@ import {
       if (!(dto as any).forceNew) {
         const ancienSupprime = await this.adminRepository.findOne({
           where: { username: Like(`${dto.username}_DELETED_%`), isDelete: 1 },
+          order: { ID: 'DESC' }, // le compte supprimé le PLUS RÉCENT
         });
         if (ancienSupprime) {
           throw new ConflictException({

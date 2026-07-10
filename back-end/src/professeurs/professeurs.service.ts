@@ -173,6 +173,7 @@ export class ProfesseursService {
     if (!(dto as any).forceNew) {
       const ancienSupprime = await this.personneRepository.findOne({
         where: { username: Like(`${dto.username}_DELETED_%`), isDelete: 1 },
+        order: { idPers: 'DESC' }, // le compte supprimé le PLUS RÉCENT
       });
       if (ancienSupprime) {
         throw new ConflictException({

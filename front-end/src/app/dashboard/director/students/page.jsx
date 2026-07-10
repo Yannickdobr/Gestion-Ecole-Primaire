@@ -86,6 +86,8 @@ export default function StudentsPage() {
   const [parentForm, setParentForm] = useState(PARENT_VIDE);
   const [envoiParent, setEnvoiParent] = useState(false);
   const [parentErreur, setParentErreur] = useState("");
+  // Choix restaurer / créer un nouveau quand l'email correspond à un compte supprimé
+  const [parentRestoreModal, setParentRestoreModal] = useState({ isOpen: false, restoreId: null, ancienNom: "", message: "", pendingData: null });
 
   const charger = useCallback(async () => {
     setLoading(true);
@@ -269,6 +271,15 @@ export default function StudentsPage() {
 
   const majParent = (champ, valeur) => setParentForm((f) => ({ ...f, [champ]: valeur }));
 
+  // Crée le compte parent (avec extra = { forceNew } ou { restoreId }) puis le rattache à l'élève
+  const rattacherParentAvec = async (data) => {
+    const personne = await createPersonne(data);
+    await addParentToEleve(parentsEleve.matricule, { idPers: personne.idPers });
+    setParentForm(PARENT_VIDE);
+    const liste = await getParentsEleve(parentsEleve.matricule);
+    setParentsListe(Array.isArray(liste) ? liste : []);
+  };
+
   const soumettreParent = async (ev) => {
     ev.preventDefault();
     setParentErreur("");
@@ -277,27 +288,44 @@ export default function StudentsPage() {
       setParentErreur("Nom, prénom et email sont obligatoires.");
       return;
     }
+    // typePersonne = 4 = Parent ; mot de passe généré et envoyé par email
+    const data = {
+      nom: nom.trim(),
+      prenom: prenom.trim(),
+      username: username.trim(),
+      typePersonne: 4,
+      mobile: parentForm.mobile.trim() || undefined,
+      idAdmin: user?.role === "admin" && user?.id ? Number(user.id) : undefined,
+    };
     setEnvoiParent(true);
     try {
-      // 1) Créer le compte Personne (typePersonne = 4 = Parent ; mot de passe généré et envoyé par email)
-      const personne = await createPersonne({
-        nom: nom.trim(),
-        prenom: prenom.trim(),
-        username: username.trim(),
-        typePersonne: 4,
-        mobile: parentForm.mobile.trim() || undefined,
-        idAdmin: user?.role === "admin" && user?.id ? Number(user.id) : undefined,
-      });
-      // 2) Rattacher ce parent à l'élève
-      await addParentToEleve(parentsEleve.matricule, { idPers: personne.idPers });
-      // 3) Recharger la liste des parents
-      setParentForm(PARENT_VIDE);
-      const data = await getParentsEleve(parentsEleve.matricule);
-      setParentsListe(Array.isArray(data) ? data : []);
-      // L'email d'identifiants est garanti envoyé : en cas d'échec, le backend
-      // aurait levé une erreur (503) et ni le parent ni le rattachement n'existeraient.
+      await rattacherParentAvec(data);
     } catch (e) {
-      setParentErreur(e.message || "Échec de la création du parent.");
+      if (e.requireRestoreChoice) {
+        // L'email correspond à un compte supprimé : proposer restaurer / créer un nouveau
+        setParentRestoreModal({ isOpen: true, restoreId: e.restoreId, ancienNom: e.ancienNom, message: e.message, pendingData: data });
+      } else {
+        setParentErreur(e.message || "Échec de la création du parent.");
+      }
+    } finally {
+      setEnvoiParent(false);
+    }
+  };
+
+  // Résout le choix restaurer / créer un nouveau pour le rattachement parent
+  const resoudreRestaurationParent = async (mode) => {
+    const base = parentRestoreModal.pendingData;
+    if (!base) return;
+    const data = mode === "restore"
+      ? { ...base, restoreId: parentRestoreModal.restoreId }
+      : { ...base, forceNew: true };
+    setEnvoiParent(true);
+    try {
+      await rattacherParentAvec(data);
+      setParentRestoreModal({ isOpen: false, restoreId: null, ancienNom: "", message: "", pendingData: null });
+    } catch (e) {
+      setParentErreur(e.message || "Échec de l'opération.");
+      setParentRestoreModal({ isOpen: false, restoreId: null, ancienNom: "", message: "", pendingData: null });
     } finally {
       setEnvoiParent(false);
     }
@@ -821,6 +849,33 @@ export default function StudentsPage() {
         onClose={() => setDeleteModal({ isOpen: false, item: null, impact: [], message: "" })}
         onConfirm={executeDelete}
       />
+
+      {/* Choix : restaurer l'ancien compte parent supprimé, ou en créer un nouveau */}
+      {parentRestoreModal.isOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(26,18,8,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1100 }}>
+          <div style={{ width: "100%", maxWidth: 460, background: "#fff", borderRadius: 20, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
+            <h2 style={{ fontSize: 19, fontWeight: 800, color: "var(--text-dark)", fontFamily: "var(--font-display)", marginBottom: 10 }}>Compte existant</h2>
+            <p style={{ fontSize: 14, color: "#4a3728", marginBottom: 6 }}>{parentRestoreModal.message}</p>
+            {parentRestoreModal.ancienNom && (
+              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18 }}>Ancien compte : <b>{parentRestoreModal.ancienNom}</b></p>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => setParentRestoreModal({ isOpen: false, restoreId: null, ancienNom: "", message: "", pendingData: null })} disabled={envoiParent}
+                style={{ padding: "10px 18px", borderRadius: 10, border: "1.5px solid var(--surface-border)", background: "#faf9f7", color: "#4a3728", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+              <button onClick={() => resoudreRestaurationParent("new")} disabled={envoiParent}
+                style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--surface-border)", color: "var(--brown)", fontSize: 13.5, fontWeight: 600, cursor: envoiParent ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                Non, créer un nouveau
+              </button>
+              <button onClick={() => resoudreRestaurationParent("restore")} disabled={envoiParent}
+                style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 13.5, fontWeight: 600, cursor: envoiParent ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: "0 4px 12px rgba(216,99,16,0.25)" }}>
+                Oui, restaurer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
