@@ -15,6 +15,7 @@ import { Cours } from '../entities/cours.entity';
 import { Salle } from '../entities/salle.entity';
 import { Classe } from '../entities/classe.entity';
 import { MailService } from '../mail/mail.service';
+import { WhatsappService } from '../mail/whatsapp.service';
 import { verifierAvantSuppression } from '../common/referential-integrity';
 import { Parents } from '../entities/parents.entity';
 import { Residents } from '../entities/residents.entity';
@@ -62,7 +63,25 @@ export class ProfesseursService {
     private classeRepository: Repository<Classe>,
 
     private readonly mailService: MailService,
+    private readonly whatsappService: WhatsappService,
   ) {}
+
+  /**
+   * Envoie les identifiants par le bon canal : WhatsApp si l'identifiant de
+   * connexion est un numéro de téléphone, e-mail sinon. Renvoie true si le
+   * message a été accepté. (Un compte n'est jamais créé si l'envoi échoue.)
+   */
+  private async envoyerIdentifiantsAuto(params: {
+    to: string;
+    nomComplet: string;
+    username: string;
+    motDePasse: string;
+    role: string;
+  }): Promise<boolean> {
+    return WhatsappService.estTelephone(params.to)
+      ? this.whatsappService.envoyerIdentifiants(params)
+      : this.mailService.envoyerIdentifiants(params);
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // GESTION DES PERSONNES (profils enseignants)
@@ -140,7 +159,8 @@ export class ProfesseursService {
 
       // On envoie les nouveaux identifiants AVANT d'enregistrer la restauration :
       // si l'envoi échoue, le compte reste supprimé (aucune modification persistée).
-      const emailEnvoye = await this.mailService.envoyerIdentifiants({
+      const parWhatsapp = WhatsappService.estTelephone(dto.username);
+      const emailEnvoye = await this.envoyerIdentifiantsAuto({
         to: dto.username,
         nomComplet: `${dto.prenom} ${dto.nom}`,
         username: dto.username,
@@ -149,7 +169,9 @@ export class ProfesseursService {
       });
       if (!emailEnvoye) {
         throw new ServiceUnavailableException(
-          `Compte non restauré : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+          parWhatsapp
+            ? `Compte non restauré : impossible d'envoyer les identifiants par WhatsApp au ${dto.username} (service WhatsApp non configuré ou numéro invalide).`
+            : `Compte non restauré : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
         );
       }
 
@@ -209,12 +231,14 @@ export class ProfesseursService {
     if (admin) personne.admin = admin;
 
     // Si le mot de passe est GÉNÉRÉ, l'utilisateur ne peut accéder au compte que par
-    // l'email d'identifiants : on l'envoie AVANT d'enregistrer. Si l'envoi échoue,
-    // on n'enregistre RIEN (pas de compte fantôme sans identifiants).
-    // (Si le créateur a saisi lui-même le mot de passe, aucun email n'est requis.)
+    // l'envoi des identifiants (e-mail OU WhatsApp selon l'identifiant de connexion) :
+    // on l'envoie AVANT d'enregistrer. Si l'envoi échoue, on n'enregistre RIEN
+    // (pas de compte fantôme sans identifiants).
+    // (Si le créateur a saisi lui-même le mot de passe, aucun envoi n'est requis.)
     let emailEnvoye: boolean | null = null;
     if (motDePasseGenere) {
-      emailEnvoye = await this.mailService.envoyerIdentifiants({
+      const parWhatsapp = WhatsappService.estTelephone(dto.username);
+      emailEnvoye = await this.envoyerIdentifiantsAuto({
         to: dto.username,
         nomComplet: `${dto.prenom} ${dto.nom}`,
         username: dto.username,
@@ -223,7 +247,9 @@ export class ProfesseursService {
       });
       if (!emailEnvoye) {
         throw new ServiceUnavailableException(
-          `Compte non créé : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
+          parWhatsapp
+            ? `Compte non créé : impossible d'envoyer les identifiants par WhatsApp au ${dto.username} (service WhatsApp non configuré ou numéro invalide).`
+            : `Compte non créé : impossible d'envoyer les identifiants à "${dto.username}". Vérifiez l'adresse e-mail et réessayez.`,
         );
       }
     }

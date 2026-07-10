@@ -16,6 +16,7 @@ import {
   import { ChangePasswordDto } from './dto/change-password.dto';
   import { CreateAdminDto } from './dto/create-admin.dto';
   import { MailService } from '../mail/mail.service';
+  import { WhatsappService } from '../mail/whatsapp.service';
 
   // Mot de passe provisoire lisible (sans caractères ambigus)
   function genererMotDePasse(longueur = 10): string {
@@ -39,6 +40,7 @@ import {
       private jwtService: JwtService,
 
       private readonly mailService: MailService,
+      private readonly whatsappService: WhatsappService,
     ) {}
   
     /**
@@ -190,10 +192,12 @@ import {
         role = 'Personnel';
       }
 
-      // username = email (pour les Personnes c'est garanti) → on envoie le nouveau mdp
-      await this.mailService
-        .envoyerIdentifiants({ to: username, nomComplet, username, motDePasse: nouveau, role })
-        .catch(() => {});
+      // Envoi du nouveau mot de passe par le bon canal : WhatsApp si l'identifiant
+      // de connexion est un numéro de téléphone (parent), e-mail sinon.
+      const envoi = WhatsappService.estTelephone(username)
+        ? this.whatsappService.envoyerIdentifiants({ to: username, nomComplet, username, motDePasse: nouveau, role })
+        : this.mailService.envoyerIdentifiants({ to: username, nomComplet, username, motDePasse: nouveau, role });
+      await envoi.catch(() => {});
 
       return generique;
     }

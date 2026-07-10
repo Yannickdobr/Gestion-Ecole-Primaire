@@ -5,6 +5,7 @@ import { Messages } from '../entities/messages.entity';
 import { Parents } from '../entities/parents.entity';
 import { Personne } from '../entities/personne.entity';
 import { MailService } from '../mail/mail.service';
+import { WhatsappService } from '../mail/whatsapp.service';
 
 /**
  * Notifications automatiques (BF-23) — double canal :
@@ -21,6 +22,7 @@ export class NotificationService {
     @InjectRepository(Parents) private readonly parentsRepo: Repository<Parents>,
     @InjectRepository(Personne) private readonly personneRepo: Repository<Personne>,
     private readonly mail: MailService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   /** Expéditeur institutionnel : l'utilisateur déclencheur (si Personne) ou un membre du personnel. */
@@ -78,9 +80,14 @@ export class NotificationService {
           this.logger.warn(`Message in-app non créé (matricule ${matricule}) : ${(e as Error).message}`);
         }
       }
-      const email = lien.personne?.username;
-      if (email && (await this.mail.envoyer({ to: email, sujet: objet, texte: information }))) {
-        emails++;
+      // Canal externe selon l'identifiant du parent : WhatsApp si c'est un
+      // numéro de téléphone, e-mail sinon. (« emails » = messages externes envoyés.)
+      const identifiant = lien.personne?.username;
+      if (identifiant) {
+        const envoye = WhatsappService.estTelephone(identifiant)
+          ? await this.whatsapp.envoyer({ to: identifiant, sujet: objet, texte: information })
+          : await this.mail.envoyer({ to: identifiant, sujet: objet, texte: information });
+        if (envoye) emails++;
       }
     }
     return { inApp, emails };

@@ -685,7 +685,7 @@ export default function LoginPage() {
           <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, background: "#fff", borderRadius: 18, padding: 26, boxShadow: "0 24px 64px rgba(0,0,0,0.25)" }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: "#1a1208", fontFamily: "var(--font-display)", marginBottom: 6 }}>Mot de passe oublié</h2>
             <p style={{ fontSize: 13, color: "#8a7060", marginBottom: 16 }}>
-              Saisis ton identifiant (email). Si un compte existe, un nouveau mot de passe te sera envoyé par email.
+              Saisis ton identifiant (e-mail ou numéro de téléphone). Si un compte existe, un nouveau mot de passe te sera envoyé par e-mail ou par WhatsApp.
             </p>
             <form onSubmit={soumettreOubli}>
               <input

@@ -40,7 +40,7 @@ const labelStyle = { display: "block", fontSize: 12, fontWeight: 600, color: "#4
 
 const FORM_VIDE = { nom: "", prenom: "", dateNaissance: "", sexe: "1", lieuNaissance: "", langue: "", groupeSanguin: "", idVilleNaissance: "", idSalle: "", idAca: "", photoURL: "" };
 const GROUPES_SANGUINS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-const PARENT_VIDE = { nom: "", prenom: "", username: "", mobile: "" };
+const PARENT_VIDE = { nom: "", prenom: "", username: "", mobile: "", canal: "email", telephone: "" };
 
 function formatDate(d) {
   if (!d) return "—";
@@ -283,18 +283,23 @@ export default function StudentsPage() {
   const soumettreParent = async (ev) => {
     ev.preventDefault();
     setParentErreur("");
-    const { nom, prenom, username } = parentForm;
-    if (!nom || !prenom || !username) {
-      setParentErreur("Nom, prénom et email sont obligatoires.");
+    const { nom, prenom, canal } = parentForm;
+    // Identifiant de connexion selon le canal choisi (e-mail OU téléphone).
+    const parTelephone = canal === "phone";
+    const identifiant = (parTelephone ? parentForm.telephone : parentForm.username).trim();
+    if (!nom || !prenom || !identifiant) {
+      setParentErreur(parTelephone ? "Nom, prénom et numéro de téléphone sont obligatoires." : "Nom, prénom et email sont obligatoires.");
       return;
     }
-    // typePersonne = 4 = Parent ; mot de passe généré et envoyé par email
+    // typePersonne = 4 = Parent. L'identifiant devient le username (login).
+    // Le champ non choisi prend une valeur par défaut côté backend.
+    // Si téléphone : mobile = le numéro (le mot de passe part par WhatsApp).
     const data = {
       nom: nom.trim(),
       prenom: prenom.trim(),
-      username: username.trim(),
+      username: identifiant,
       typePersonne: 4,
-      mobile: parentForm.mobile.trim() || undefined,
+      mobile: parTelephone ? identifiant : (parentForm.mobile.trim() || undefined),
       idAdmin: user?.role === "admin" && user?.id ? Number(user.id) : undefined,
     };
     setEnvoiParent(true);
@@ -810,17 +815,37 @@ export default function StudentsPage() {
                   <input style={inputStyle} value={parentForm.prenom} onChange={(e) => majParent("prenom", e.target.value)} />
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={labelStyle}>Email *</label>
-                  <input type="email" style={inputStyle} value={parentForm.username} onChange={(e) => majParent("username", e.target.value)} placeholder="ex : prenom.nom@gmail.com" />
+                  <label style={labelStyle}>Méthode de connexion *</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[{ v: "email", l: "E-mail" }, { v: "phone", l: "Téléphone (WhatsApp)" }].map((o) => (
+                      <button type="button" key={o.v} onClick={() => majParent("canal", o.v)}
+                        style={{ flex: 1, padding: "9px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600, border: "1.5px solid var(--surface-border)", background: parentForm.canal === o.v ? "linear-gradient(135deg, var(--orange), var(--brown))" : "#faf9f7", color: parentForm.canal === o.v ? "white" : "#4a3728" }}>
+                        {o.l}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label style={labelStyle}>Mobile</label>
-                  <input style={inputStyle} value={parentForm.mobile} onChange={(e) => majParent("mobile", e.target.value)} placeholder="Optionnel" />
-                </div>
+                {parentForm.canal === "email" ? (
+                  <>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Email *</label>
+                      <input type="email" style={inputStyle} value={parentForm.username} onChange={(e) => majParent("username", e.target.value)} placeholder="ex : prenom.nom@gmail.com" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Mobile</label>
+                      <input style={inputStyle} value={parentForm.mobile} onChange={(e) => majParent("mobile", e.target.value)} placeholder="Optionnel" />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label style={labelStyle}>Numéro de téléphone (WhatsApp) *</label>
+                    <input type="tel" style={inputStyle} value={parentForm.telephone} onChange={(e) => majParent("telephone", e.target.value)} placeholder="ex : +237 6XX XX XX XX" />
+                  </div>
+                )}
               </div>
 
               <p style={{ fontSize: 12, color: "#8a7060", marginTop: 12 }}>
-                ℹ️ Le mot de passe est généré et envoyé par email au parent (modifiable ensuite depuis son espace).
+                ℹ️ Le mot de passe est généré et envoyé au parent {parentForm.canal === "phone" ? "par WhatsApp à son numéro" : "par e-mail"} (modifiable ensuite depuis son espace). Le parent se connectera avec {parentForm.canal === "phone" ? "son numéro de téléphone" : "son e-mail"}.
               </p>
 
               {parentErreur && (
