@@ -5,7 +5,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
+import { Frequente } from '../entities/frequente.entity';
 import { Trimestre } from '../entities/trimestre.entity';
 import { Session } from '../entities/session.entity';
 import { NatureEpreuve } from '../entities/nature-epreuve.entity';
@@ -542,6 +543,127 @@ export class EvaluationsService {
     });
 
     return { idSession, effectif: lignes.length, classement: lignes };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // BULLETIN TRIMESTRIEL (calculé — agrège toutes les sessions du trimestre)
+  //
+  // Règle : par matière, on regroupe TOUTES les notes du trimestre (toutes
+  // sessions) → moyenne de la matière. La moyenne générale est la moyenne des
+  // moyennes de matière PONDÉRÉE par le coefficient du cours. Le rang est
+  // calculé au sein de la classe de l'élève pour l'année du trimestre.
+  // ══════════════════════════════════════════════════════════════════════════
+  async bulletinTrimestriel(matricule: number, idTrimes: number): Promise<any> {
+    const trimestre = await this.trimestreRepository.findOne({
+      where: { idTrimes, isDelete: 0 },
+      relations: ['anneeAcademique'],
+    });
+    if (!trimestre) throw new NotFoundException(`Trimestre introuvable (id: ${idTrimes})`);
+    const idAca = Number(trimestre.anneeAcademique?.idAnnee);
+
+    const eleve = await this.eleveRepository.findOne({ where: { matricule, isDelete: 0 } });
+    if (!eleve) throw new NotFoundException(`Élève introuvable (matricule: ${matricule})`);
+
+    // Sessions du trimestre
+    const sessions = await this.sessionRepository.find({
+      where: { trimestre: { idTrimes }, isDelete: 0 },
+    });
+    const idSessions = sessions.map((s) => Number(s.idSession));
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    // Calcule les moyennes (par matière + générale pondérée) d'un élève sur le trimestre
+    const calcEleve = async (mat: number) => {
+      if (idSessions.length === 0) return { matieres: [] as any[], generale: 0 };
+      const notes = await this.evaluationRepository.find({
+        where: { eleve: { matricule: mat }, session: { idSession: In(idSessions) }, isDelete: 0 },
+        relations: ['cours', 'session', 'epreuve'],
+      });
+      const parCours = new Map<number, { cours: any; notes: number[] }>();
+      for (const n of notes) {
+        const idC = Number(n.cours?.idCours);
+        if (!idC) continue;
+        if (!parCours.has(idC)) parCours.set(idC, { cours: n.cours, notes: [] });
+        parCours.get(idC)!.notes.push(Number(n.note));
+      }
+      const matieres = [...parCours.values()]
+        .map((g) => {
+          const moyenne = g.notes.length ? g.notes.reduce((a, b) => a + b, 0) / g.notes.length : 0;
+          return {
+            idCours: g.cours?.idCours,
+            libelle: g.cours?.libelle,
+            coefficient: Number(g.cours?.coefficient) || 1,
+            nbNotes: g.notes.length,
+            moyenne: r2(moyenne),
+          };
+        })
+        .sort((a, b) => (a.libelle || '').localeCompare(b.libelle || ''));
+      const totalCoef = matieres.reduce((s, m) => s + m.coefficient, 0);
+      const generale = totalCoef
+        ? matieres.reduce((s, m) => s + m.moyenne * m.coefficient, 0) / totalCoef
+        : 0;
+      return { matieres, generale: r2(generale) };
+    };
+
+    const moi = await calcEleve(matricule);
+
+    // Rang dans la classe : roster de la classe de l'élève pour l'année du trimestre
+    const mgr = this.evaluationRepository.manager;
+    const maFreq = await mgr.findOne(Frequente, {
+      where: { eleve: { matricule }, anneeAcademique: { idAnnee: idAca }, isDelete: 0 },
+      relations: ['salle', 'salle.classe'],
+    });
+    const idClasse = maFreq?.salle?.classe?.idClasse;
+
+    let rang: number | null = null;
+    let effectif: number | null = null;
+    let moyenneClasse: number | null = null;
+    if (idClasse) {
+      const freqs = await mgr.find(Frequente, {
+        where: { salle: { classe: { idClasse } }, anneeAcademique: { idAnnee: idAca }, isDelete: 0 },
+        relations: ['eleve'],
+      });
+      const matricules = [
+        ...new Set(freqs.map((f) => Number(f.eleve?.matricule)).filter(Boolean)),
+      ];
+      const moyennes: { matricule: number; generale: number; rang?: number }[] = [];
+      for (const mat of matricules) {
+        const r = await calcEleve(mat);
+        moyennes.push({ matricule: mat, generale: r.generale });
+      }
+      moyennes.sort((a, b) => b.generale - a.generale);
+      let rg = 0;
+      let prev: number | null = null;
+      moyennes.forEach((m, i) => {
+        if (prev === null || m.generale < prev) { rg = i + 1; prev = m.generale; }
+        m.rang = rg;
+      });
+      effectif = moyennes.length;
+      rang = moyennes.find((m) => Number(m.matricule) === Number(matricule))?.rang ?? null;
+      moyenneClasse = moyennes.length
+        ? r2(moyennes.reduce((s, m) => s + m.generale, 0) / moyennes.length)
+        : null;
+    }
+
+    const mention =
+      moi.generale >= 16 ? 'Très Bien'
+      : moi.generale >= 14 ? 'Bien'
+      : moi.generale >= 12 ? 'Assez Bien'
+      : moi.generale >= 10 ? 'Passable'
+      : 'Insuffisant';
+
+    return {
+      eleve: { matricule: eleve.matricule, nom: eleve.nom, prenom: eleve.prenom },
+      trimestre: { idTrimes: trimestre.idTrimes, libelle: trimestre.libelle },
+      annee: trimestre.anneeAcademique?.libelle ?? null,
+      classe: idClasse ? { idClasse, libelle: maFreq?.salle?.classe?.libelle } : null,
+      matieres: moi.matieres,
+      moyenneGenerale: moi.generale,
+      moyenneClasse,
+      rang,
+      effectif,
+      mention,
+    };
   }
 
   // ══════════════════════════════════════════════════════════════════════════

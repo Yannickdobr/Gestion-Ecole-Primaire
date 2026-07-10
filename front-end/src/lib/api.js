@@ -321,6 +321,9 @@ export const getNotesEleve = (matricule) =>
 
 // Référentiels d'évaluation
 export const getTrimestres = () => apiFetch("/evaluations/trimestres");
+// Bulletin trimestriel calculé (moyennes par matière, générale pondérée, rang, mention)
+export const getBulletinTrimestriel = (matricule, idTrimes) =>
+  apiFetch(`/evaluations/bulletin-trimestriel/${matricule}/trimestre/${idTrimes}`);
 export const getSessions = () => apiFetch("/evaluations/sessions");
 export const getNatures = () => apiFetch("/evaluations/natures");
 export const getEpreuves = () => apiFetch("/evaluations/epreuves");

@@ -165,6 +165,18 @@ export class EvaluationsController {
   @ApiOperation({ summary: 'Classement d\'une session (moyennes + rangs)' })
   classementSession(@Param('idSession', ParseIntPipe) idSession: number) { return this.evaluationsService.classementSession(idSession); }
 
+  @Get('bulletin-trimestriel/:matricule/trimestre/:idTrimes')
+  @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL, Role.PARENT)
+  @ApiOperation({ summary: 'Bulletin trimestriel calculé (moyennes par matière, générale pondérée, rang, mention)' })
+  async bulletinTrimestriel(
+    @Request() req,
+    @Param('matricule', ParseIntPipe) matricule: number,
+    @Param('idTrimes', ParseIntPipe) idTrimes: number,
+  ) {
+    await this.acl.assertEleveAccess(req.user, matricule);
+    return this.evaluationsService.bulletinTrimestriel(matricule, idTrimes);
+  }
+
   @Get('notes/moyenne/:matricule/session/:idSession')
   @Roles(...DIRECTION, Role.ENSEIGNANT, ...PERSONNEL, Role.PARENT)
   @ApiOperation({ summary: 'Calculer la moyenne d\'un élève pour une session' })

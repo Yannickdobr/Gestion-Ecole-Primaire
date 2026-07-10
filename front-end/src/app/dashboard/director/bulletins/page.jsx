@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { useActiveYear } from "@/context/ActiveYearContext";
-import { getSessions, getClassementSession, getNotesEleve, getClasses, getFrequenteBySalle } from "@/lib/api";
-import { imprimerBulletin } from "@/lib/print";
+import { getSessions, getClassementSession, getNotesEleve, getClasses, getFrequenteBySalle, getTrimestres, getBulletinTrimestriel } from "@/lib/api";
+import { imprimerBulletin, imprimerBulletinTrimestriel } from "@/lib/print";
 import { Award, ChevronDown, Trophy, Printer } from "lucide-react";
 
 const thStyle = { padding: "12px 18px", fontSize: 13, fontWeight: 600, color: "var(--muted)", textAlign: "left", borderBottom: "1px solid var(--surface-border)" };
@@ -18,6 +18,8 @@ const medaille = (r) => (r === 1 ? "🥇" : r === 2 ? "🥈" : r === 3 ? "🥉" 
 export default function BulletinsPage() {
   const { anneeId } = useActiveYear();
   const [sessions, setSessions] = useState([]);
+  const [trimestres, setTrimestres] = useState([]);
+  const [idTrimes, setIdTrimes] = useState("");
   const [idSession, setIdSession] = useState("");
   const [data, setData] = useState(null); // { effectif, classement }
   const [classes, setClasses] = useState([]);
@@ -30,6 +32,7 @@ export default function BulletinsPage() {
 
   useEffect(() => {
     getSessions().then((s) => setSessions(Array.isArray(s) ? s : [])).catch(() => setSessions([]));
+    getTrimestres().then((t) => setTrimestres(Array.isArray(t) ? t : [])).catch(() => setTrimestres([]));
     getClasses().then((c) => setClasses(Array.isArray(c) ? c : [])).catch(() => setClasses([]));
   }, []);
 
@@ -96,10 +99,14 @@ export default function BulletinsPage() {
     }
   };
 
-  // Sessions restreintes à l'année active
+  // Sessions et trimestres restreints à l'année active
   const sessionsAnnee = anneeId
     ? sessions.filter((s) => Number(s.trimestre?.anneeAcademique?.idAnnee) === Number(anneeId))
     : sessions;
+  const trimestresAnnee = anneeId
+    ? trimestres.filter((t) => Number(t.anneeAcademique?.idAnnee) === Number(anneeId))
+    : trimestres;
+  const libTrimestre = trimestresAnnee.find((t) => String(t.idTrimes) === String(idTrimes))?.libelle || "";
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", fontFamily: "var(--font-body)" }}>
@@ -125,6 +132,13 @@ export default function BulletinsPage() {
             {classes.map((c) => <option key={c.idClasse} value={c.idClasse}>{c.libelle}</option>)}
           </select>
         </div>
+        <div style={{ minWidth: 260 }}>
+          <label style={labelStyle}>Trimestre (bulletin trimestriel)</label>
+          <select style={inputStyle} value={idTrimes} onChange={(e) => setIdTrimes(e.target.value)}>
+            <option value="">— Choisir un trimestre —</option>
+            {trimestresAnnee.map((t) => <option key={t.idTrimes} value={t.idTrimes}>{t.libelle}</option>)}
+          </select>
+        </div>
       </div>
 
       {error && <div style={{ padding: "12px 16px", marginBottom: 16, borderRadius: 12, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#dc2626", fontSize: 14 }}>{error}</div>}
@@ -146,6 +160,7 @@ export default function BulletinsPage() {
               {filteredData.classement.map((l) => (
                 <FragmentRow key={l.matricule} l={l} idSession={Number(idSession)}
                   sessionLibelle={sessions.find((s) => String(s.idSession) === String(idSession))?.libelle || ""}
+                  idTrimes={idTrimes} libTrimestre={libTrimestre}
                   effectif={filteredData.effectif}
                   open={open === l.matricule} notes={notes[l.matricule]} onToggle={() => voirBulletin(l.matricule)} />
               ))}
@@ -160,7 +175,7 @@ export default function BulletinsPage() {
   );
 }
 
-function FragmentRow({ l, idSession, sessionLibelle, effectif, open, notes, onToggle }) {
+function FragmentRow({ l, idSession, sessionLibelle, idTrimes, libTrimestre, effectif, open, notes, onToggle }) {
   const notesSession = (notes || []).filter((n) => Number(n.session?.idSession) === idSession);
 
   const imprimer = async () => {
@@ -168,6 +183,15 @@ function FragmentRow({ l, idSession, sessionLibelle, effectif, open, notes, onTo
     if (!n) n = await getNotesEleve(l.matricule).catch(() => []);
     const ns = (n || []).filter((x) => Number(x.session?.idSession) === idSession);
     imprimerBulletin({ eleve: { matricule: l.matricule, prenom: l.prenom, nom: l.nom }, session: sessionLibelle, notes: ns, moyenne: l.moyenne, rang: l.rang, effectif });
+  };
+
+  const imprimerTrimestre = async () => {
+    try {
+      const b = await getBulletinTrimestriel(l.matricule, Number(idTrimes));
+      imprimerBulletinTrimestriel(b);
+    } catch (e) {
+      alert(e.message || "Impossible de générer le bulletin trimestriel.");
+    }
   };
 
   return (
@@ -179,7 +203,12 @@ function FragmentRow({ l, idSession, sessionLibelle, effectif, open, notes, onTo
         <td style={{ ...tdStyle, color: "var(--muted)" }}>{l.nbNotes}</td>
         <td style={{ ...tdStyle, textAlign: "right" }}>
           <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={imprimer} title="Imprimer le bulletin" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            {idTrimes && (
+              <button onClick={imprimerTrimestre} title={`Bulletin trimestriel — ${libTrimestre}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, var(--orange), var(--brown))", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                <Printer size={13} /> Trimestriel
+              </button>
+            )}
+            <button onClick={imprimer} title="Imprimer le bulletin de session" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
               <Printer size={13} /> Bulletin
             </button>
             <button onClick={onToggle} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--surface-border)", background: "var(--surface)", color: "var(--orange)", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>

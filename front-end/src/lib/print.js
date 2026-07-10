@@ -72,6 +72,33 @@ export function imprimerBulletin({ eleve, session, notes, moyenne, rang = null, 
   ouvrirImpression(`Bulletin_${eleve?.matricule || ""}`, corps);
 }
 
+/** Bulletin trimestriel calculé (agrège toutes les sessions du trimestre). */
+export function imprimerBulletinTrimestriel(b) {
+  const r2 = (m) => (m == null ? "—" : Math.round(Number(m) * 100) / 100);
+  const lignes = (b?.matieres || []).map((m) =>
+    `<tr><td>${esc(m.libelle || "Matière")}</td><td>${esc(m.coefficient ?? 1)}</td><td>${esc(m.nbNotes ?? 0)}</td><td><b>${r2(m.moyenne)}/20</b></td></tr>`
+  ).join("");
+  const corps = `
+    <h1>Bulletin trimestriel</h1>
+    <div class="meta">${esc(b?.trimestre?.libelle || "")}${b?.annee ? ` · Année ${esc(b.annee)}` : ""}${b?.classe?.libelle ? ` · Classe ${esc(b.classe.libelle)}` : ""}</div>
+    <div class="grid" style="margin:18px 0">
+      <div><b>Élève :</b> ${esc(b?.eleve?.prenom)} ${esc(b?.eleve?.nom)}</div>
+      <div><b>Matricule :</b> #${esc(b?.eleve?.matricule)}</div>
+    </div>
+    <table><thead><tr><th>Matière</th><th>Coef.</th><th>Nb notes</th><th>Moyenne</th></tr></thead>
+      <tbody>${lignes || '<tr><td colspan="4">Aucune note pour ce trimestre.</td></tr>'}</tbody></table>
+    <div class="total"><span>Moyenne générale${b?.rang ? ` · Rang ${b.rang}${b?.effectif ? "/" + b.effectif : ""}` : ""}</span><span>${r2(b?.moyenneGenerale)}/20</span></div>
+    <div class="grid" style="margin-top:12px">
+      <div><b>Mention :</b> ${esc(b?.mention || "—")}</div>
+      <div><b>Moyenne de la classe :</b> ${r2(b?.moyenneClasse)}/20</div>
+    </div>
+    <div style="margin-top:40px;display:flex;justify-content:space-between;font-size:12px;color:#4a3728">
+      <div>Le Titulaire<br/><br/>__________________</div>
+      <div>Le Directeur<br/><br/>__________________</div>
+    </div>`;
+  ouvrirImpression(`Bulletin_trimestriel_${b?.eleve?.matricule || ""}`, corps);
+}
+
 /** PV de délibération (décisions de passage d'une classe). */
 export function imprimerPV({ classe, session, annee, lignes }) {
   const rows = (lignes || []).map((l, i) =>
